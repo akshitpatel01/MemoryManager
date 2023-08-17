@@ -1,4 +1,5 @@
 #include "hash_linear.h"
+#include "list.h"
 #include "util.h"
 #include <cstdint>
 #include <iostream>
@@ -21,7 +22,11 @@ Hash_linear::Hash_linear(bool (*__m_lookup_func)(void *, void *))
     _cur_size = 0;
 
     for (i = 0; i < HASH_MAX_BUCKETS; i++) {
+#ifdef C_LIST
         _m_buckets[i].set_list(list_init(_m_lookup_func));
+#else
+        _m_buckets[i].set_list(new List(_m_lookup_func, true));
+#endif
         _m_buckets[i].lock_init();
     }
 }
@@ -71,9 +76,15 @@ Hash_linear::__insert_lockless(uint32_t hash, void *__key, void *__data)
         return false;
     }
 
+#ifdef C_LIST
     if ((ret = list_insert_tail(_m_buckets[hash].get_list(), __key, __data)) == 1) {
         _cur_size++;
     }
+#else
+    if ((ret = _m_buckets[hash].get_list()->insert_tail(__key, __data)) == true) {
+        _cur_size++;
+    }
+#endif
 
     return ret;
 }
@@ -98,9 +109,15 @@ Hash_linear::__remove_lockless(uint32_t hash, void *__key)
     if (!__key) {
         return false;
     }
+#ifdef C_LIST
     if ((ret = list_remove_entry(_m_buckets[hash].get_list(), __key, NULL, false)) == 1) {
         _cur_size--;
     }
+#else
+    if ((ret = _m_buckets[hash].get_list()->remove(__key, NULL)) == true) {
+        _cur_size--;
+    }
+#endif
     return ret;
 }
 bool 
@@ -121,8 +138,13 @@ Hash_linear::__remove(uint32_t hash, void *__key)
 void*
 Hash_linear::__lookup_lockless(uint32_t hash, void *__key) const
 {
+#ifdef C_LIST
     return list_lookup_entry(_m_buckets[hash].get_list(),  __key, NULL);
+#else
+    return _m_buckets[hash].get_list()->lookup(__key, NULL);
+#endif
 }
+
 void*
 Hash_linear::__lookup(uint32_t hash, void *__key) const
 {
@@ -132,7 +154,7 @@ Hash_linear::__lookup(uint32_t hash, void *__key) const
     }
 
     _m_buckets[hash].lock_bucket();
-    ret = list_lookup_entry(_m_buckets[hash].get_list(),  __key, NULL);
+    ret = __lookup_lockless(hash, __key);
     _m_buckets[hash].unlock_bucket();
 
     return ret;

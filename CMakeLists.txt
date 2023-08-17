@@ -13,7 +13,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories (${CMAKE_INCLUDE_PATH})
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 add_library(hash_lib STATIC ${SRC})
 target_include_directories(hash_lib PUBLIC ${CMAKE_INCLUDE_PATH})

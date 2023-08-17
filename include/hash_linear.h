@@ -5,46 +5,64 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <pthread.h>
 #include <atomic>
+#include "list.h"
+#include <cassert>
 extern "C" {
     #include "util.h"
 }
-#define MULTI_THREAD
-#define HASH_MAX_BUCKETS 4096
+//#define MULTI_THREAD
+#define HASH_MAX_BUCKETS 409600
 class Hash_linear: public __hash_base {
     private:
-        //std::array<std::unique_ptr<list_t>, HASH_MAX_BUCKETS> _m_buckets;
-        //list_t *_m_buckets[HASH_MAX_BUCKETS];
         typedef struct _bucket_t_ {
             private:
                 list_t *_list;
-                mutable pthread_mutex_t _bucket_lock;
+                List* m_list;
+                mutable std::mutex m_bucket_lock;
             public:
+                _bucket_t_()
+                    :_list(nullptr), m_list(nullptr)
+                {
+
+                }
                 void set_list(list_t *__list)
                 {
                     _list = __list;
                 }
+                void set_list(List *__list)
+                {
+                    m_list = __list;
+                }
+                
+#ifdef C_LIST
                 list_t* get_list() const
                 {
                     return _list;
                 }
+#else
+                List* get_list() const
+                {
+                    return m_list;
+                }
+#endif
                 void lock_init()
                 {
-                    pthread_mutex_init(&_bucket_lock, NULL);
                 }
                 void lock_bucket() const
                 {
-                    pthread_mutex_lock(&_bucket_lock);
+                    m_bucket_lock.lock();
                 }
                 void unlock_bucket() const
                 {
-                    pthread_mutex_unlock(&_bucket_lock);
+                    m_bucket_lock.unlock();
                 }
                 ~_bucket_t_ ()
                 {
-                    pthread_mutex_destroy(&_bucket_lock);
                     list_delete(_list, false);
+                    delete m_list;
                 }
         } bucket_t;
         bucket_t _m_buckets[HASH_MAX_BUCKETS];
