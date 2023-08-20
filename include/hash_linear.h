@@ -13,41 +13,30 @@
 extern "C" {
     #include "util.h"
 }
-//#define MULTI_THREAD
+#define MULTI_THREAD
 #define HASH_MAX_BUCKETS 409600
 class Hash_linear: public __hash_base {
     private:
         typedef struct _bucket_t_ {
             private:
-                list_t *_list;
                 List* m_list;
                 mutable std::mutex m_bucket_lock;
             public:
                 _bucket_t_()
-                    :_list(nullptr), m_list(nullptr)
+                    : m_list(nullptr)
                 {
 
-                }
-                void set_list(list_t *__list)
-                {
-                    _list = __list;
                 }
                 void set_list(List *__list)
                 {
                     m_list = __list;
                 }
                 
-#ifdef C_LIST
-                list_t* get_list() const
-                {
-                    return _list;
-                }
-#else
                 List* get_list() const
                 {
                     return m_list;
                 }
-#endif
+ 
                 void lock_init()
                 {
                 }
@@ -61,11 +50,15 @@ class Hash_linear: public __hash_base {
                 }
                 ~_bucket_t_ ()
                 {
-                    list_delete(_list, false);
                     delete m_list;
                 }
         } bucket_t;
-        bucket_t _m_buckets[HASH_MAX_BUCKETS];
+        //bucket_t _m_buckets[HASH_MAX_BUCKETS];
+        bucket_t* m_cur_table;
+        bucket_t* _m_buckets;
+        bucket_t* _m_pending_buckets;
+        //std::unique_ptr<bucket_t[]> _m_buckets;
+        //std::unique_ptr<bucket_t[]> _m_pending_buckets;
         bool (*_m_lookup_func)(void *, void *);
         std::atomic<uint32_t> _max_size;
         std::atomic<uint32_t> _cur_size;
@@ -78,6 +71,7 @@ class Hash_linear: public __hash_base {
         bool __insert(uint32_t hash, void *__key, void *__data);
         bool __remove(uint32_t hash, void *__key);
         void* __lookup(uint32_t hash, void *__key) const;
+        void** __lookup_lockless_mutable(uint32_t hash, void *__key) const;
         
     public:
         Hash_linear(bool (*__m_lookup_func)(void *, void *));

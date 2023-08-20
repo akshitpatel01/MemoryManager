@@ -69,12 +69,70 @@ int main()
     fut3.wait();
     fut4.wait();
     fut5.wait();
+    
 #else
     insert_thread(h_obj);
     lookup_thread(h_obj);
     remove_thread(h_obj);
     insert_thread(h_obj);
     remove_thread(h_obj);
+//#define BASIC_TEST
+#ifdef BASIC_TEST
+    int *key = new int(10);
+    int key1 = 10;
+    int key2 = 11;
+    int val = 50;
+    int val2 = 100;
+    int *test = nullptr;
+    if ((test = h_obj->lookup(key)) != nullptr) {
+        std::cout << "key " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key1)) != nullptr) {
+        std::cout << "key1 " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key2)) != nullptr) {
+        std::cout << "key2 " << *test << std::endl;
+    }
+    h_obj->insert(key, &val);
+    if ((test = h_obj->lookup(key)) != nullptr) {
+        std::cout << "key " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key1)) != nullptr) {
+        std::cout << "key1 " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key2)) != nullptr) {
+        std::cout << "key2 " << *test << std::endl;
+    }
+    h_obj->insert(key, &val2);
+    test = nullptr;
+    if ((test = h_obj->lookup(key)) != nullptr) {
+        std::cout << "key " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key1)) != nullptr) {
+        std::cout << "key1 " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key2)) != nullptr) {
+        std::cout << "key2 " << *test << std::endl;
+    }
+    h_obj->remove(&key1);
+    if ((test = h_obj->lookup(key)) != nullptr) {
+        std::cout << "key " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key1)) != nullptr) {
+        std::cout << "key1 " << *test << std::endl;
+    }
+    test = nullptr;
+    if ((test = h_obj->lookup(&key2)) != nullptr) {
+        std::cout << "key2 " << *test << std::endl;
+    }
+#endif
 
 #endif
 
