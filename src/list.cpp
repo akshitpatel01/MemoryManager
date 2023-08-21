@@ -180,12 +180,12 @@ List::__remove_lockless (void *__key, void *__val)
         
 List::List (bool (*__lookup_func) (void*, void*))
     : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
-      m_is_multi_threaded(false)
+      m_is_multi_threaded(false), m_is_moved(false)
 {
 }
 List::List(bool (*__lookup_func) (void*, void*), bool __is_multi_threaded)
     : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
-      m_is_multi_threaded(__is_multi_threaded)
+      m_is_multi_threaded(__is_multi_threaded), m_is_moved(false)
 {
 }
 

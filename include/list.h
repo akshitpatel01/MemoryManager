@@ -15,6 +15,7 @@ class List {
         _list_entry_t_ *m_tail;
         std::recursive_mutex m_list_lock;
         bool m_is_multi_threaded;
+        bool m_is_moved;
 
     public:
         typedef struct _list_iter_t_{

@@ -53,31 +53,40 @@ class Hash_linear: public __hash_base {
                     delete m_list;
                 }
         } bucket_t;
-        //bucket_t _m_buckets[HASH_MAX_BUCKETS];
+        typedef enum {
+            LOOKUP_FAILED = 0,
+            LOOKUP_SUCCESS_OLD_TAB,
+            LOOKUP_SUCCESS_NEW_TAB,
+        } m_lookup_ret_params;
+    private:
         bucket_t* m_cur_table;
-        bucket_t* _m_buckets;
-        bucket_t* _m_pending_buckets;
-        //std::unique_ptr<bucket_t[]> _m_buckets;
-        //std::unique_ptr<bucket_t[]> _m_pending_buckets;
+        bucket_t* m_old_table;
+        uint32_t m_old_tab_ref_cnt;
+        uint32_t m_cur_tab_ref_cnt;
         bool (*_m_lookup_func)(void *, void *);
-        std::atomic<uint32_t> _max_size;
-        std::atomic<uint32_t> _cur_size;
+        std::atomic<uint32_t> m_max_size;
+        std::atomic<uint32_t> m_cur_size;
 
     private:
         const uint32_t __universal_hash(void *key, uint size) const;
         bool __insert_lockless(uint32_t hash, void *__key, void *__data);
         bool __remove_lockless(uint32_t hash, void *__key);
-        void* __lookup_lockless(uint32_t hash, void *__key) const;
+        void* __lookup_lockless(bucket_t* _tab, uint32_t hash, void *__key);
         bool __insert(uint32_t hash, void *__key, void *__data);
         bool __remove(uint32_t hash, void *__key);
-        void* __lookup(uint32_t hash, void *__key) const;
-        void** __lookup_lockless_mutable(uint32_t hash, void *__key) const;
+        void* __lookup(bucket_t* _tab, uint32_t hash, void *__key);
+        void** __lookup_lockless_mutable(bucket_t* _tab, uint32_t hash, void *__key);
+        bucket_t* __get_cur_tab();
+        bucket_t* __get_old_tab();
+        void __rel_cur_tab();
+        void __rel_old_tab();
+        bool __init_table(bucket_t** __tab, uint32_t __size);
         
     public:
         Hash_linear(bool (*__m_lookup_func)(void *, void *));
         bool insert(uint32_t hash, void *__key, void *__data);
         bool remove(uint32_t hash, void *__key);
-        void* lookup(uint32_t hash, void *__key) const;
+        void* lookup(uint32_t hash, void *__key);
         const uint32_t calculate_hash(void *key, uint size) const;
         ~Hash_linear();
 };
