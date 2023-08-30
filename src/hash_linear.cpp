@@ -1,125 +1,192 @@
 #include "hash_linear.h"
 #include "list.h"
 #include "util.h"
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <future>
+#include <gnu/stubs-64.h>
 #include <iostream>
+#include <iterator>
 #include <memory>
+#include <mutex>
 #include <pthread.h>
+#include <ratio>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <thread>
+#include <tuple>
 
 /* public functions
  */
 
 Hash_linear::~Hash_linear()
 {
-    std::cout << "Cur size: " << _cur_size << std::endl;
-    delete[] _m_buckets;
+    __del_tab(m_cur_tab);
+    __del_tab(m_old_tab);
 }
-Hash_linear::Hash_linear(bool (*__m_lookup_func)(void *, void *))
-    :_m_lookup_func(__m_lookup_func)
-{
-    m_max_size = HASH_MAX_BUCKETS;
-    m_cur_size = 0;
-    m_cur_tab_ref_cnt = 0;
-    m_old_tab_ref_cnt = 0;
-
-    __init_table(&m_cur_table, m_max_size);
-    m_old_table = nullptr;
-}
-
-bool Hash_linear::__init_table(bucket_t** __tab, uint32_t __size)
-{
-    uint i;
-
-    *__tab = new bucket_t[HASH_MAX_BUCKETS]();
-    if (*__tab == nullptr) {
-        return false;
-    }
-    for (i = 0; i < __size; i++) {
-        (*__tab[i]).set_list(new List(_m_lookup_func));
-        (*__tab[i]).lock_init();
-    }
-
-    return true;
-}
-Hash_linear::bucket_t*
-Hash_linear::__get_cur_tab()
-{
-    m_cur_tab_ref_cnt++;
-    return m_cur_table;
-}
-
-Hash_linear::bucket_t*
-Hash_linear::__get_old_tab()
-{
-    if (m_old_table != nullptr) {
-        m_old_tab_ref_cnt++;
-        return m_old_table;
-    }
-
-    return nullptr;
-}
-
-void 
-Hash_linear::__rel_cur_tab()
-{
-    m_cur_tab_ref_cnt--;
-}
-
 void
-Hash_linear::__rel_old_tab()
+Hash_linear::__del_tab(std::shared_ptr<Hash_simple>& _tab) 
 {
-    m_old_tab_ref_cnt--;
+    _tab.reset();
+}
+Hash_linear::Hash_linear(bool (*__m_lookup_func)(void *, void *), uint32_t _key_size)
+    :m_lookup_func(__m_lookup_func), m_key_size(_key_size), m_max_size(HASH_MAX_BUCKETS)
+{
+
+    __init_table(m_cur_tab, HASH_MAX_BUCKETS);
+    m_old_tab = nullptr;
 }
 
 bool 
-Hash_linear::insert(uint32_t hash, void *__key, void *__data)
+Hash_linear::__init_table(std::shared_ptr<Hash_simple>& _tab, uint32_t _size)
 {
-    void *__entry_found = nullptr;
-#ifdef MULTI_THREAD
-        __entry_found = lookup(hash, __key);
-        if (__entry_found) {
 
+    Hash_simple *__temp_obj = nullptr;
+
+    __temp_obj = new Hash_simple(_size, m_lookup_func, m_key_size);
+    if(__temp_obj == nullptr) {
+        return false;
+    }
+
+    _tab.reset(std::move(__temp_obj));
+    return true;
+}
+std::shared_ptr<Hash_simple>
+Hash_linear::__get_cur_tab()
+{
+    m_cur_tab_lock.lock_shared();
+    if (m_cur_tab == nullptr) {
+        m_cur_tab_lock.unlock_shared();
+        return nullptr;
+    } else {
+    }
+    return m_cur_tab;
+}
+
+std::shared_ptr<Hash_simple>
+Hash_linear::__get_old_tab()
+{
+    m_old_tab_lock.lock_shared();
+    if (m_old_tab == nullptr) {
+        m_old_tab_lock.unlock_shared();
+        return nullptr;
+    } else {
+    }
+    return m_old_tab;
+}
+
+void
+Hash_linear::__rel_old_tab(std::shared_ptr<Hash_simple>& __tab)
+{
+    __tab.reset();
+    m_old_tab_lock.unlock_shared();
+}
+void
+Hash_linear::__rel_cur_tab(std::shared_ptr<Hash_simple>& __tab)
+{
+    __tab.reset();
+    m_cur_tab_lock.unlock_shared();
+}
+bool 
+Hash_linear::insert(uint32_t hash, void *_key, void *_data)
+{
+    bool __ret = false;
+    std::shared_ptr<Hash_simple> __tab = nullptr;
+    uint32_t __size;
+    bool __need_migration = false;
+
+#ifdef MULTI_THREAD
+    if ((__tab = __get_old_tab()) != nullptr) {
+        __ret = __tab->update_lockless(hash, _key, _data);
+        __rel_old_tab(__tab);
+        if (__ret) {
+            return __ret;
         }
-    return __insert(hash, __key, __data);
+    }
+
+    __tab = __get_cur_tab();
+    if (__tab == nullptr) {
+        std::cout << "Crash pls\n";
+        exit(0);
+        return false;
+    }
+
+    __ret =  __tab->insert(hash, _key, _data, __size);
+    if (__size > (0.75 * m_max_size)) {{
+        __need_migration = true;
+    }}
+    __rel_cur_tab(__tab);
+
+    if (__need_migration) {
+        //std::cout << "Need migrtion " << "Size: " << __size << std::endl;
+        __start_migration();
+    }
+    return __ret;
 #else
     return __insert_lockless(hash, __key, __data);
 #endif
 }
 
 bool 
-Hash_linear::remove(uint32_t hash, void *__key)
+Hash_linear::remove(uint32_t _hash, void *_key)
 {
+    bool __ret = false;
+    std::shared_ptr<Hash_simple> __tab = nullptr;
 #ifdef MULTI_THREAD
-    return __remove(hash, __key);
+    if ((__tab = __get_old_tab()) != nullptr) {
+        __ret = __tab->remove(_hash, _key);
+        __rel_old_tab(__tab);
+        if (__ret == true) {
+            return __ret;
+        } else {
+            __tab.reset();
+        }
+    }
+    
+    __tab = __get_cur_tab();
+    if (__tab == nullptr) {
+        std::cout << "Crash pls\n";
+        exit(0);
+        return false;
+    }
+
+    __ret = __tab->remove(_hash, _key);
+    __rel_cur_tab(__tab);
+
+    return __ret;
 #else
     return __remove_lockless(hash, __key);
 #endif
 }
 
 void* 
-Hash_linear::lookup(uint32_t hash, void *__key)
+Hash_linear::lookup(uint32_t _hash, void *_key)
 {
     void* entry_found = nullptr;
-    bucket_t* old_tab = nullptr;
-    bucket_t* cur_tab = nullptr;
+    std::shared_ptr<Hash_simple> old_tab = nullptr;
+    std::shared_ptr<Hash_simple> cur_tab = nullptr;
 
 #ifdef MULTI_THREAD
     old_tab = __get_old_tab();
     if (old_tab) {
-        entry_found = __lookup(old_tab, hash, __key);
+        entry_found = old_tab->lookup(_hash, _key);
+        __rel_old_tab(old_tab);
         if (entry_found != nullptr) {
-            __rel_old_tab();
             return entry_found;
         }
-        __rel_old_tab();
     }
 
     cur_tab = __get_cur_tab();
     if (cur_tab == nullptr) {
         std::cout << "some thing is not right\n";
+        exit(0);
     }
-    entry_found = __lookup(cur_tab, hash, __key);
+    entry_found = cur_tab->lookup(_hash, _key);
+    __rel_cur_tab(cur_tab);
     return entry_found;
 #else
     return __lookup_lockless(hash, __key);
@@ -130,99 +197,6 @@ const uint32_t
 Hash_linear::calculate_hash(void* __key, uint __size) const
 {
     return __universal_hash(__key, __size);
-}
-
-/* private functions
- */
-bool 
-Hash_linear::__insert_lockless(uint32_t hash, void *__key, void *__data)
-{
-    int ret;
-    void **entry_val = nullptr;
-    if (!__key) {
-        return false;
-    }
-    
-    if ((entry_val = __lookup_lockless_mutable(hash, __key)) != nullptr) {
-        *entry_val = __data;
-        return true;
-    }
-
-
-    if ((ret = _m_buckets[hash].get_list()->insert_tail(__key, __data)) == true) {
-        _cur_size++;
-    }
-
-    return ret;
-}
-bool 
-Hash_linear::__insert(uint32_t hash, void *__key, void *__data)
-{
-    bool ret = false;
-
-    if (!__key) {
-        return false;
-    }
-
-    _m_buckets[hash].lock_bucket();
-    ret = __insert_lockless(hash, __key, __data);
-    _m_buckets[hash].unlock_bucket();
-
-    return ret;
-}
-
-bool 
-Hash_linear::__remove_lockless(uint32_t hash, void *__key)
-{
-    int ret;
-    if (!__key) {
-        return false;
-    }
-    if ((ret = _m_buckets[hash].get_list()->remove(__key, NULL)) == true) {
-        _cur_size--;
-    }
-    return ret;
-}
-bool 
-Hash_linear::__remove(uint32_t hash, void *__key)
-{
-    bool ret = false;
-    if (!__key) {
-        return false;
-    }
-
-    _m_buckets[hash].lock_bucket();
-    ret = __remove_lockless(hash, __key);
-    _m_buckets[hash].unlock_bucket();
-
-    return ret;
-}
-
-void*
-Hash_linear::__lookup_lockless(bucket_t* _tab, uint32_t hash, void *__key)
-{
-    return _tab[hash].get_list()->lookup(__key, NULL);
-}
-
-void**
-Hash_linear::__lookup_lockless_mutable(bucket_t* _tab, uint32_t hash, void *__key)
-{
-    return _tab[hash].get_list()->lookup_mutable(__key, NULL);
-}
-
-void*
-Hash_linear::__lookup(bucket_t* _tab, uint32_t hash, void *__key)
-{
-    void* ret = NULL;
-    if (_tab == nullptr || __key == nullptr) {
-        return ret;
-    }
-
-    _tab[hash].lock_bucket();
-    ret = __lookup_lockless(_tab, hash, __key);
-    _tab[hash].unlock_bucket();
-
-    return ret;
 }
 
 const uint32_t 
@@ -240,4 +214,108 @@ Hash_linear::__universal_hash(void* __key, uint __size) const
     }
 
     return (hash % HASH_MAX_BUCKETS);
+}
+
+uint32_t
+Hash_linear::get_size()
+{
+    uint32_t __ret = 0;
+    std::shared_ptr<Hash_simple> __tab = nullptr;
+
+    if ((__tab = __get_old_tab()) != nullptr) {
+        __ret += __tab->get_size();
+        __rel_old_tab(__tab);
+    }
+
+    __tab = __get_cur_tab();
+    if (__tab == nullptr) {
+        std::cout << "Crash pls\n";
+        exit(0);
+        return 0;
+    }
+    __ret += __tab->get_size();
+    __rel_cur_tab(__tab);
+
+    return __ret;
+}
+
+bool
+Hash_linear::__migration_internal()
+{
+    Hash_simple::m_hash_iter_t* __hash_iter = nullptr;
+    void *__key = nullptr;
+    void *__val = nullptr;
+    uint32_t __new_hash;
+    std::shared_ptr<Hash_simple> _old_tab = nullptr;
+    std::shared_ptr<Hash_simple> _new_tab = nullptr;
+
+    _old_tab = __get_old_tab();
+    if (_old_tab == nullptr) {
+        return false;
+    }
+    _new_tab = __get_cur_tab();
+    if (_new_tab == nullptr) {
+        std::cout << "Crash psl\n";
+        exit(0);
+        return false;
+    }
+
+    if ((__hash_iter = _old_tab->iter_init()) == nullptr) {
+        __rel_old_tab(_old_tab);
+        __rel_cur_tab(_new_tab);
+        return false;
+    }
+
+    while(__hash_iter) {
+        // del && add
+        __key = _old_tab->iter_get_key(__hash_iter);
+        __val = _old_tab->iter_get_val(__hash_iter);
+        _old_tab->set_moved(__hash_iter);
+        //_old_tab->remove(__hash_iter->__bucket_ind, __key);
+        __new_hash = _new_tab->calculate_hash(__key, m_key_size);
+        _new_tab->insert(__new_hash, __key, __val);
+        __hash_iter = _old_tab->iter_inc(__hash_iter);
+    }
+    _old_tab->iter_clear(__hash_iter);
+    __rel_cur_tab(_new_tab);
+    __rel_old_tab(_old_tab);
+
+    m_old_tab_lock.lock();
+    m_old_tab.reset();
+    m_old_tab_lock.unlock();
+    return true;
+}
+
+bool
+Hash_linear::__start_migration()
+{
+    Hash_simple *__new_tab = nullptr;
+    std::shared_ptr<Hash_simple> __cur_tab;
+
+    std::lock_guard<std::mutex> __guard(m_migration_lock);
+    __cur_tab = __get_old_tab();
+    //auto __status = future_g.wait_for(std::chrono::milliseconds(0));
+    if (__cur_tab != nullptr) {
+        __rel_old_tab(__cur_tab);
+        return true;
+    }
+    __cur_tab = __get_cur_tab();
+    __new_tab = new Hash_simple(__cur_tab->get_max_size()*2, m_lookup_func, m_key_size);
+    if (__new_tab == nullptr) {
+        return false;
+    }
+
+    m_max_size = __cur_tab->get_max_size()*2;
+    __rel_cur_tab(__cur_tab);
+    m_old_tab_lock.lock();
+    m_cur_tab_lock.lock();
+    m_old_tab = m_cur_tab;
+    m_cur_tab.reset(std::move(__new_tab));
+    m_old_tab_lock.unlock();
+    m_cur_tab_lock.unlock();
+
+    //std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    auto fut = std::async(std::launch::async, &Hash_linear::__migration_internal, this);
+    future_g = std::move(fut);
+    return true;
 }

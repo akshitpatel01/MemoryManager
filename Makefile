@@ -190,6 +190,30 @@ src/hash_linear.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/hash_lib.dir/build.make CMakeFiles/hash_lib.dir/src/hash_linear.cpp.s
 .PHONY : src/hash_linear.cpp.s
 
+src/hash_simple.o: src/hash_simple.cpp.o
+.PHONY : src/hash_simple.o
+
+# target to build an object file
+src/hash_simple.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/hash_lib.dir/build.make CMakeFiles/hash_lib.dir/src/hash_simple.cpp.o
+.PHONY : src/hash_simple.cpp.o
+
+src/hash_simple.i: src/hash_simple.cpp.i
+.PHONY : src/hash_simple.i
+
+# target to preprocess a source file
+src/hash_simple.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/hash_lib.dir/build.make CMakeFiles/hash_lib.dir/src/hash_simple.cpp.i
+.PHONY : src/hash_simple.cpp.i
+
+src/hash_simple.s: src/hash_simple.cpp.s
+.PHONY : src/hash_simple.s
+
+# target to generate assembly for a file
+src/hash_simple.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/hash_lib.dir/build.make CMakeFiles/hash_lib.dir/src/hash_simple.cpp.s
+.PHONY : src/hash_simple.cpp.s
+
 src/list.o: src/list.cpp.o
 .PHONY : src/list.o
 
@@ -254,6 +278,9 @@ help:
 	@echo "... src/hash_linear.o"
 	@echo "... src/hash_linear.i"
 	@echo "... src/hash_linear.s"
+	@echo "... src/hash_simple.o"
+	@echo "... src/hash_simple.i"
+	@echo "... src/hash_simple.s"
 	@echo "... src/list.o"
 	@echo "... src/list.i"
 	@echo "... src/list.s"

@@ -1,0 +1,21 @@
+# insert
+1. If old table is present, take a lock on the bucket of the old table. 
+2. Do a lookup on the old table (safe because of recursive lock).
+3. if entry is found, update the entry. Migrating thread will take care of deleting and adding the entry in the new table. Release the bucket lock.
+4. If the entry is not found, take a lock on the bucket of the new table. Do a lookup, if found do an update, or else add a new entry. 
+
+# lookup
+1. If old table - lookup on the old table. If entry is found return;
+2. If entry not found - lookup on new table. If entry is found return found or else return not found. 
+
+Points to note:
+-> Looking up on the old table first, ensures that we are not missing the lookup if entry is present. 
+-> The reason being, there is a per-bucket lock taken by the hash table.
+-> Now, if the lookup thread comes before the migrating thread, lookup is successfull and no issues seen. If lookup thread comes after the migrating thread, lookup fails and entry is looked up in the new table and it will return success. This most probably will not result in a deadlock as taking a lock always goes from old table to new table. 
+-> It is so possible that the lookup thread is contending with an insert thread(instead of a migrating thread). In this case also, the insert thread behaves similarly as far as lookup thread is concerned (it deletes the entry found, and add it to the new hash table).
+
+# delete
+1. Same as insert. Instead of moving/modifying/deleting the entry, delete it. 
+
+# migrating thread
+1. Iterate over all the elements in the hash delete from old table and add to the new table.

@@ -8,6 +8,7 @@ class List {
             struct _list_entry_t_* prev;
             void *val;
             void *key;
+            bool m_is_moved;
         }_list_entry_t;
         
         bool (*m_lookup_func) (void*, void*);
@@ -15,7 +16,6 @@ class List {
         _list_entry_t_ *m_tail;
         std::recursive_mutex m_list_lock;
         bool m_is_multi_threaded;
-        bool m_is_moved;
 
     public:
         typedef struct _list_iter_t_{
@@ -42,9 +42,13 @@ class List {
         bool remove(void *__key, void *__val);
         void* lookup(void *__key, void *__val);
         void** lookup_mutable(void *__key, void *__val);
+        void set_moved(void *__key, void *__val);
+        void set_moved(list_iter_t *__iter);
 
         list_iter_t* iter_init();
         void iter_clear(list_iter_t *__iter);
         list_iter_t* iter_inc(list_iter_t *__iter);
         list_iter_t* iter_dec(list_iter_t *__iter);
+        void* iter_get_val(list_iter_t *__iter);
+        void* iter_get_key(list_iter_t *__iter);
 };

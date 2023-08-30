@@ -31,6 +31,26 @@ List::__iter_deref (list_iter_t *__iter)
 
     return _cur_entry;
 }
+void* 
+List::iter_get_val(list_iter_t *_iter)
+{
+    _list_entry_t* __temp = __iter_deref(_iter);
+    if (__temp == nullptr) {
+        return nullptr;
+    }
+
+    return __get_val(__temp);
+}
+void* 
+List::iter_get_key(list_iter_t *_iter)
+{
+    _list_entry_t* __temp = __iter_deref(_iter);
+    if (__temp == nullptr) {
+        return nullptr;
+    }
+
+    return __get_key(__temp);
+}
 
 List::_list_entry_t* 
 List::__lookup_lockless(void *__key, void *__val)
@@ -48,17 +68,27 @@ List::__lookup_lockless(void *__key, void *__val)
             if (m_lookup_func(__get_key(_cur_entry), __key))
             {
                 iter_clear(_iter);
-                return _cur_entry;
+                if (_cur_entry->m_is_moved) {
+                    return nullptr;
+                } else {
+                    return _cur_entry;
+                }
             }
         } else {
             if (m_lookup_func(__get_val(_cur_entry), __val))
             {
                 iter_clear(_iter);
-                return _cur_entry;
+                if (_cur_entry->m_is_moved) {
+                    return nullptr;
+                } else {
+                    return _cur_entry;
+                }
             }
         }
+        _iter = iter_inc(_iter);
     }
 
+    iter_clear(_iter);
     return nullptr;
 }
 
@@ -85,6 +115,7 @@ List::__insert_head_lockless(void *__key, void *__val)
     _new_entry->prev = nullptr;
     _new_entry->key = __key;
     _new_entry->val = __val;
+    _new_entry->m_is_moved = false;
     if (m_head) {
         m_head->prev = _new_entry;
     } else {
@@ -119,6 +150,7 @@ List::__insert_tail_lockless(void *__key, void *__val)
     _new_entry->prev = m_tail;
     _new_entry->key = __key;
     _new_entry->val = __val;
+    _new_entry->m_is_moved = false;
     if (m_tail) {
         m_tail->next = _new_entry;
     } else {
@@ -128,8 +160,37 @@ List::__insert_tail_lockless(void *__key, void *__val)
 
     return true;
 }
+void
+List::set_moved(void *_key, void *_val)
+{
+   _list_entry_t *__entry = nullptr;
 
+    std::lock_guard<std::recursive_mutex> guard(m_list_lock);
+   if (_key) {
+        __entry = __lookup_lockless(_key, nullptr);
+        if (__entry) {
+            __entry->m_is_moved = true;
+        }
+   } else {
+        __entry = __lookup_lockless(nullptr, _val);
+        if (__entry) {
+            __entry->m_is_moved = true;
+        }
+   } 
+}
 
+void
+List::set_moved(list_iter_t* _iter)
+{
+    _list_entry_t *__entry = nullptr;
+
+    if (_iter == nullptr || _iter->cur == nullptr) {
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> guard(m_list_lock);
+    __entry = _iter->cur;
+    __entry->m_is_moved = true;
+}
 bool 
 List::__remove_lockless (void *__key, void *__val)
 {
@@ -180,12 +241,12 @@ List::__remove_lockless (void *__key, void *__val)
         
 List::List (bool (*__lookup_func) (void*, void*))
     : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
-      m_is_multi_threaded(false), m_is_moved(false)
+      m_is_multi_threaded(false)
 {
 }
 List::List(bool (*__lookup_func) (void*, void*), bool __is_multi_threaded)
     : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
-      m_is_multi_threaded(__is_multi_threaded), m_is_moved(false)
+      m_is_multi_threaded(__is_multi_threaded)
 {
 }
 

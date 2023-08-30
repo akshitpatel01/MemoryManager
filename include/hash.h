@@ -15,7 +15,7 @@ class Hash {
     public:
         explicit 
         Hash(bool (*lookup_func)(void *, void *))
-        : m_hashclass_obj(lookup_func), m_hash_p(&m_hashclass_obj)
+        : m_hashclass_obj(lookup_func, sizeof(__key_type)), m_hash_p(&m_hashclass_obj)
         {
         }
 
