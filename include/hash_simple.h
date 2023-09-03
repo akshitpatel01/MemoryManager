@@ -55,7 +55,11 @@ class Hash_simple {
     public:
         typedef struct hash_iter_t_ {
             uint __bucket_ind;
-            List::list_iter_t *__list_iter;
+            List::Iterator __list_iter;
+            hash_iter_t_(List& _list)
+                :__bucket_ind(0), __list_iter(_list.begin())
+            {
+            }
         } m_hash_iter_t;
         m_hash_iter_t* iter_init();
         void iter_clear(m_hash_iter_t* _iter);

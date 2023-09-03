@@ -266,8 +266,10 @@ Hash_linear::__migration_internal()
         return false;
     }
 
+    int count = 0;
     while(__hash_iter) {
         // del && add
+        count++;
         __key = _old_tab->iter_get_key(__hash_iter);
         __val = _old_tab->iter_get_val(__hash_iter);
         _old_tab->set_moved(__hash_iter);

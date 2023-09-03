@@ -136,7 +136,6 @@ int main()
     fut3.wait();
     fut4.wait();
     fut5.wait();
-
 #define BASIC_TEST
 #ifdef BASIC_TEST
     int *key = new int(10);
@@ -193,6 +192,7 @@ int main()
     if ((test = h_obj->lookup(&key2)) != nullptr) {
         std::cout << "key2 " << *test << std::endl;
     }
+    delete key;
 #endif
 
 #else

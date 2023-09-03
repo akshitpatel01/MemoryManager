@@ -1,4 +1,5 @@
 #include "list.h"
+#include <utility>
 
 void *
 List::__get_key(_list_entry_t* __entry)
@@ -19,76 +20,32 @@ List::__get_val(_list_entry_t* __entry)
 
     return __entry->val;
 }
-
-
-List::_list_entry_t *
-List::__iter_deref (list_iter_t *__iter)
-{
-    if (__iter == nullptr || __iter->cur == nullptr) {
-        return nullptr;
-    }
-    _list_entry_t *_cur_entry = static_cast<_list_entry_t*>(__iter->cur);
-
-    return _cur_entry;
-}
-void* 
-List::iter_get_val(list_iter_t *_iter)
-{
-    _list_entry_t* __temp = __iter_deref(_iter);
-    if (__temp == nullptr) {
-        return nullptr;
-    }
-
-    return __get_val(__temp);
-}
-void* 
-List::iter_get_key(list_iter_t *_iter)
-{
-    _list_entry_t* __temp = __iter_deref(_iter);
-    if (__temp == nullptr) {
-        return nullptr;
-    }
-
-    return __get_key(__temp);
-}
-
 List::_list_entry_t* 
 List::__lookup_lockless(void *__key, void *__val)
 {
-    list_iter_t *_iter = nullptr;
-    _list_entry_t *_cur_entry = nullptr;
-
-    _iter = iter_init();
-    if (_iter == nullptr) {
-        return nullptr;
-    }
-
-    while((_cur_entry = __iter_deref(_iter)) != nullptr) {
-        if (__key) {
-            if (m_lookup_func(__get_key(_cur_entry), __key))
+    for(List::Iterator it = begin(); it != end(); it++) {
+        auto __cur_entry = *it;
+        if (__get_key(__cur_entry)) {
+            if (m_lookup_func(__get_key(__cur_entry), __key))
             {
-                iter_clear(_iter);
-                if (_cur_entry->m_is_moved) {
+                if (__cur_entry->m_is_moved) {
                     return nullptr;
                 } else {
-                    return _cur_entry;
+                    ;
+                    return __cur_entry;
                 }
             }
         } else {
-            if (m_lookup_func(__get_val(_cur_entry), __val))
+            if (m_lookup_func(__get_val(__cur_entry), __val))
             {
-                iter_clear(_iter);
-                if (_cur_entry->m_is_moved) {
+                if (__cur_entry->m_is_moved) {
                     return nullptr;
                 } else {
-                    return _cur_entry;
+                    return __cur_entry;
                 }
             }
         }
-        _iter = iter_inc(_iter);
     }
-
-    iter_clear(_iter);
     return nullptr;
 }
 
@@ -116,11 +73,8 @@ List::__insert_head_lockless(void *__key, void *__val)
     _new_entry->key = __key;
     _new_entry->val = __val;
     _new_entry->m_is_moved = false;
-    if (m_head) {
-        m_head->prev = _new_entry;
-    } else {
-        m_tail = _new_entry;
-    }
+    
+    m_head->prev = _new_entry;
     m_head = _new_entry;
 
     return true;
@@ -146,17 +100,15 @@ List::__insert_tail_lockless(void *__key, void *__val)
         return false;
     }
 
-    _new_entry->next = nullptr;
-    _new_entry->prev = m_tail;
+    _new_entry->next = m_tail;
+    _new_entry->prev = m_tail->prev;
     _new_entry->key = __key;
     _new_entry->val = __val;
     _new_entry->m_is_moved = false;
-    if (m_tail) {
-        m_tail->next = _new_entry;
-    } else {
+    if (m_head == m_tail) {
         m_head = _new_entry;
+        m_tail->prev = _new_entry;
     }
-    m_tail = _new_entry;
 
     return true;
 }
@@ -180,15 +132,12 @@ List::set_moved(void *_key, void *_val)
 }
 
 void
-List::set_moved(list_iter_t* _iter)
+List::set_moved(Iterator& _iter)
 {
     _list_entry_t *__entry = nullptr;
 
-    if (_iter == nullptr || _iter->cur == nullptr) {
-        return;
-    }
     std::lock_guard<std::recursive_mutex> guard(m_list_lock);
-    __entry = _iter->cur;
+    __entry = *_iter;
     __entry->m_is_moved = true;
 }
 bool 
@@ -204,11 +153,7 @@ List::__remove_lockless (void *__key, void *__val)
             } else {
                 m_head = _del_entry->next;
             }
-            if (_del_entry->next) {
-                _del_entry->next->prev = _del_entry->prev;
-            } else {
-                m_tail = _del_entry->prev;
-            }
+            _del_entry->next->prev = _del_entry->prev;
 
             delete _del_entry;
             return true;
@@ -223,11 +168,7 @@ List::__remove_lockless (void *__key, void *__val)
             } else {
                 m_head = _del_entry->next;
             }
-            if (_del_entry->next) {
-                _del_entry->next->prev = _del_entry->prev;
-            } else {
-                m_tail = _del_entry->prev;
-            }
+            _del_entry->next->prev = _del_entry->prev;
 
             delete _del_entry;
             return true;
@@ -240,12 +181,12 @@ List::__remove_lockless (void *__key, void *__val)
 }
         
 List::List (bool (*__lookup_func) (void*, void*))
-    : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
+    : m_lookup_func(__lookup_func), m_tail(new _list_entry_t_()), m_head(m_tail),
       m_is_multi_threaded(false)
 {
 }
 List::List(bool (*__lookup_func) (void*, void*), bool __is_multi_threaded)
-    : m_lookup_func(__lookup_func), m_head(nullptr), m_tail(nullptr),
+    : m_lookup_func(__lookup_func), m_tail(new _list_entry_t_()), m_head(m_tail),
       m_is_multi_threaded(__is_multi_threaded)
 {
 }
@@ -337,61 +278,7 @@ List::lookup_mutable(void *__key, void *__val)
     return nullptr;
 }
 
-List::list_iter_t* 
-List::iter_init()
+List::~List()
 {
-    list_iter_t* _new_iter = new(list_iter_t);
-    if (_new_iter == nullptr) {
-        return nullptr;
-    }
-
-    _new_iter->cur = m_head;
-    _new_iter->prev = nullptr;
-    if (m_head) {
-        _new_iter->next = m_head->next;
-    } else {
-        _new_iter->next = nullptr;
-    }
-
-    return _new_iter;
-}
-
-void 
-List::iter_clear(list_iter_t *__iter)
-{
-    if (__iter) {
-        delete __iter;
-    }
-}
-
-List::list_iter_t*
-List::iter_inc(list_iter_t *__iter)
-{
-    if (__iter == nullptr || __iter->cur == nullptr) {
-        return nullptr;
-    }
-
-    __iter->prev = __iter->cur;
-    __iter->cur = __iter->next;
-    if (__iter->next != nullptr) {
-        __iter->next = __iter->next->next;
-    }
-
-    return __iter;
-}
-
-List::list_iter_t* 
-List::iter_dec(list_iter_t *__iter)
-{
-    if (__iter == nullptr || __iter->cur == nullptr) {
-        return nullptr;
-    }
-
-    __iter->next = __iter->cur;
-    __iter->cur = __iter->prev;
-    if (__iter->prev != nullptr) {
-        __iter->prev = __iter->prev->prev;
-    }
-
-    return __iter;
+    delete m_tail;
 }

@@ -93,7 +93,7 @@ Hash_simple::remove_lockless(uint32_t hash, void *__key)
     if (!__key){
         return false;
     }
-    if ((__ret = m_tab[hash].get_list()->remove(__key, NULL)) == true) {
+    if ((__ret = m_tab[hash].get_list()->remove(__key, nullptr)) == true) {
         __ret = true;
         m_cur_size--;
     }
@@ -172,15 +172,11 @@ Hash_simple::m_hash_iter_t*
 Hash_simple::iter_init()
 {
     m_hash_iter_t *__temp = nullptr;
-    if ((__temp = new m_hash_iter_t()) == nullptr) {
+    if ((__temp = new m_hash_iter_t(*(m_tab[0].get_list()))) == nullptr) {
         return nullptr;
     }
 
-    __temp->__bucket_ind = 0;
-    m_tab[__temp->__bucket_ind].lock_bucket();
-    __temp->__list_iter = m_tab[__temp->__bucket_ind].get_list()->iter_init();
-
-    if (__temp->__list_iter->cur == nullptr) {
+    if (__temp->__list_iter == m_tab[__temp->__bucket_ind].get_list()->end()) {
         __temp = iter_inc(__temp);
     }
     
@@ -193,23 +189,21 @@ Hash_simple::iter_clear(m_hash_iter_t* _iter)
         return;
     }
     
-    m_tab[_iter->__bucket_ind].get_list()->iter_clear(_iter->__list_iter);
+    //m_tab[_iter->__bucket_ind].get_list()->iter_clear(_iter->__list_iter);
     delete _iter;
 }
 bool
 Hash_simple::__advance_bucket(m_hash_iter_t* _iter)
 {
-    auto __list = m_tab[_iter->__bucket_ind].get_list();
     /* Cleanup */
     m_tab[_iter->__bucket_ind].unlock_bucket();
-    __list->iter_clear(_iter->__list_iter);
 
     _iter->__bucket_ind += 1;
     if (_iter->__bucket_ind >= m_max_size) {
         return false;
     }
     m_tab[_iter->__bucket_ind].lock_bucket();
-    _iter->__list_iter = m_tab[_iter->__bucket_ind].get_list()->iter_init();
+    _iter->__list_iter = m_tab[_iter->__bucket_ind].get_list()->begin();
 
     return true;
 }
@@ -219,18 +213,25 @@ Hash_simple::__advance_bucket(m_hash_iter_t* _iter)
 Hash_simple::m_hash_iter_t* 
 Hash_simple::iter_inc(m_hash_iter_t* _iter)
 {
-   do {
-       if (_iter->__list_iter->cur == nullptr) {
-           if (__advance_bucket(_iter) == false) {
-                return nullptr;
-           }
-       } else {
-           auto __list = m_tab[_iter->__bucket_ind].get_list();
-           _iter->__list_iter = __list->iter_inc(_iter->__list_iter);
-       }
-   } while (_iter->__list_iter->cur == nullptr);
+    bool __next_item_found = false;
 
-   return _iter;
+    while (!__next_item_found) {
+        auto __list = m_tab[_iter->__bucket_ind].get_list();
+
+        if (_iter->__list_iter == __list->end()) {
+            if (__advance_bucket(_iter) == false) {
+                delete _iter;
+                return nullptr;
+            }
+        } else {
+            _iter->__list_iter++;
+
+            if (_iter->__list_iter != __list->end()) {
+                __next_item_found = true;
+            }
+        }
+    }
+    return _iter;
 }
 
 void* 
@@ -238,22 +239,23 @@ Hash_simple::iter_get_val(m_hash_iter_t* _iter)
 {
    auto __list = m_tab[_iter->__bucket_ind].get_list();
 
-   if (_iter == nullptr || _iter->__list_iter == nullptr) {
+   if (_iter == nullptr || _iter->__list_iter == __list->end()) {
        return nullptr;
    }
 
-    return __list->iter_get_val(_iter->__list_iter);
+   return _iter->__list_iter.get_val();
 }
 
 void* 
 Hash_simple::iter_get_key(m_hash_iter_t* _iter)
 {
-   if (_iter == nullptr || _iter->__list_iter == nullptr) {
+   auto __list = m_tab[_iter->__bucket_ind].get_list();
+
+   if (_iter == nullptr || _iter->__list_iter == __list->end()) {
        return nullptr;
    }
    
-   auto __list = m_tab[_iter->__bucket_ind].get_list();
-   return __list->iter_get_key(_iter->__list_iter);
+   return _iter->__list_iter.get_key();
 }
 void
 Hash_simple::set_moved(m_hash_iter_t *_iter)

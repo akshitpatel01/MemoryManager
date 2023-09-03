@@ -1,6 +1,24 @@
 #pragma once
 
+#include "iterator.h"
 #include <mutex>
+#include <utility>
+template <class List>
+class ListIterator: public Iterator<List> {
+    public:
+        ListIterator(typename Iterator<List>::PointerType _ptr)
+            :Iterator<List>(_ptr)
+        {
+        }
+        void* get_key()
+        {
+            return Iterator<List>::m_ptr->key;
+        }
+        void *get_val()
+        {
+            return Iterator<List>::m_ptr->val;
+        }
+};
 class List {
     private:
         typedef struct _list_entry_t_ {
@@ -12,22 +30,24 @@ class List {
         }_list_entry_t;
         
         bool (*m_lookup_func) (void*, void*);
-        _list_entry_t_ *m_head;
         _list_entry_t_ *m_tail;
+        _list_entry_t_ *m_head;
         std::recursive_mutex m_list_lock;
         bool m_is_multi_threaded;
 
     public:
-        typedef struct _list_iter_t_{
-            struct _list_entry_t_* cur;
-            struct _list_entry_t_* next;
-            struct _list_entry_t_* prev;
-        } list_iter_t;
+        using ValueType = typeof(_list_entry_t_);
+        using Iterator = ListIterator<List>;
+        Iterator begin() {
+            return Iterator(m_head);
+        }
+        Iterator end() {
+            return Iterator(m_tail);
+        }
 
     private:
         void *__get_key(_list_entry_t* __entry);
         void *__get_val(_list_entry_t* __entry);
-        _list_entry_t* __iter_deref (list_iter_t *__iter);
         _list_entry_t* __lookup_lockless(void *__key, void *__val);
         bool __insert_head_lockless(void *__key, void *__val);
         bool __insert_tail_lockless(void *__key, void *__val);
@@ -36,6 +56,7 @@ class List {
     public:
         List(bool (*__lookup_func) (void*, void*));
         List(bool (*__lookup_func) (void*, void*), bool __is_multi_threaded);
+        ~List();
 
         bool insert_head(void *__key, void *__val);
         bool insert_tail(void *__key, void *__val);
@@ -43,12 +64,5 @@ class List {
         void* lookup(void *__key, void *__val);
         void** lookup_mutable(void *__key, void *__val);
         void set_moved(void *__key, void *__val);
-        void set_moved(list_iter_t *__iter);
-
-        list_iter_t* iter_init();
-        void iter_clear(list_iter_t *__iter);
-        list_iter_t* iter_inc(list_iter_t *__iter);
-        list_iter_t* iter_dec(list_iter_t *__iter);
-        void* iter_get_val(list_iter_t *__iter);
-        void* iter_get_key(list_iter_t *__iter);
+        void set_moved(Iterator& __iter);
 };
