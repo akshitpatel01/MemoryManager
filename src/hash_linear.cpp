@@ -1,6 +1,5 @@
 #include "hash_linear.h"
 #include "list.h"
-#include "util.h"
 #include <atomic>
 #include <chrono>
 #include <cmath>
