@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.10)                         
 project(hash LANGUAGES CXX C VERSION 1.0.0 DESCRIPTION "Test")
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MONGOCXX REQUIRED IMPORTED_TARGET libmongocxx)
 set (CMAKE_SOURCE_DIR ${CMAKE_HOME_DIRECTORY}/src)
 set (CMAKE_BINARY_DIR ${CMAKE_HOME_DIRECTORY}/build)
-set (CMAKE_INCLUDE_PATH ${CMAKE_HOME_DIRECTORY}/include)
+set (CMAKE_INCLUDE_PATH ${CMAKE_HOME_DIRECTORY}/include ${MONGOCXX_INCLUDE_DIRS})
 #set (SRC ${CMAKE_SOURCE_DIR}/hash_linear.cpp ${CMAKE_SOURCE_DIR}/util.c)
 file(GLOB SRC ${CMAKE_SOURCE_DIR}/**) 
 set (CMAKE_CXX_STANDARD 17)
@@ -26,4 +28,4 @@ set(exec test)
 add_executable(${exec}
                 Main.cpp )
 target_link_libraries(${exec}
-                        hash_lib)
+                        hash_lib ${MONGOCXX_LIBRARIES})

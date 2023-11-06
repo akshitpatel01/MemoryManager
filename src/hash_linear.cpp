@@ -212,7 +212,7 @@ Hash_linear::__universal_hash(void* __key, uint __size) const
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
     }
 
-    return (hash % HASH_MAX_BUCKETS);
+    return (hash % m_max_size);
 }
 
 uint32_t
