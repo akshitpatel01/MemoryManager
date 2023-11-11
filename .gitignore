@@ -1,0 +1,6 @@
+.cache/
+CMakeFiles/
+build/
+test/
+*.cmake
+*.json
