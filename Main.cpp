@@ -30,29 +30,37 @@ void test1(node_manager& test)
 void cleanup(node_manager& test)
 {
 
-    std::string db1 = "segment_db";
+    std::string db1 = "test1";
     test.del_all(1);
 }
-int main()
+
+int main(int argc, char** argv)
 {
-    node_manager test{};
-    std::string db1 = "segment_db";
+    int i = 0;
+    node_manager node_mgr = node_manager();
+    char data[] = "hehehe";
+    argv++;
+
+    for (i = 1; i < argc; i++) {
+        std::string db_name{*argv};
+        node_mgr.test();
+        node_mgr.add_db(db_name);
+        node_mgr.insert(i, "file1", 5, (void*)data, strlen(data));
+        //node_mgr.remove(i, "file1", 5);
+        std::shared_ptr<segment> s1 = node_mgr.lookup(i, "file1", 5);
+        if (s1) {
+            std::cout << "Id: " << s1->get_id() << " ";
+            std::cout << "Len: " << s1->get_len() << " ";
+            std::cout << std::endl;
+        }
+        argv++;
+    }
+    /*node_manager test{};
+    std::string db1 = "test2";
     test.add_db(db1);
     cleanup(test);
-    test1(test);
-    test2(test);
-#if 0
-    std::string db1 = "segment_db";
-    const char *data = "hehehehhehe\n";
-    node_manager test_obj = node_manager();
-    test_obj.test();
-    test_obj.add_db(db1);
-    test_obj.insert(1, "file1", 5, (void*)data, strlen(data));
-    std::shared_ptr<segment> s1 = test_obj.lookup(1, "file1", 5);
-    if (s1) {
-        std::cout << "Id: " << s1->get_id() << " ";
-        std::cout << "Len: " << s1->get_len() << " ";
-        std::cout << std::endl;
-    }
-#endif
+    //test1(test);
+    //test2(test);
+    //*/
+    //const char *data = "hehehehhehe\n";
 }
