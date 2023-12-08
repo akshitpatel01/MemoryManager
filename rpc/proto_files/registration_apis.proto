@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package registration_apis;
+
+message node_reg {
+    uint32 ip = 1;
+}
+
+message db_reg {
+    uint32 node_id = 1;
+}
+
+message node_reg_rsp {
+    uint32 node_id = 1;
+}
+
+message db_reg_rsp {
+    uint32 db_id = 1;
+}
+
+service Register {
+
+    rpc reg_node(node_reg) returns (node_reg_rsp);
+    rpc reg_db(db_reg) returns (db_reg_rsp);
+}

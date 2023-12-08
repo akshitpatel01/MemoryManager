@@ -6,6 +6,7 @@ set (CMAKE_INCLUDE_PATH ${CMAKE_HOME_DIRECTORY}/include)
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(libs)
+add_subdirectory(rpc)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -22,12 +23,15 @@ target_include_directories(library_blob_manager
                             PUBLIC
                             ${CMAKE_INCLUDE_PATH}
                             libs/hash/include
+                            ${ProtobufIncludePath} 
+                            ${_gRPC_PROTO_GENS_DIR}
                           )
 target_sources(library_blob_manager 
                 PRIVATE
                 PUBLIC
                     ${SRC}
                     ${CMAKE_INCLUDE_PATH}
+                    ${_gRPC_PROTO_GENS_DIR}
               )
 # test
 
@@ -38,4 +42,5 @@ target_link_libraries(${exec}
                         PRIVATE
                         library_hash
                         library_blob_manager
+                        reg_proto_lib
                     )
