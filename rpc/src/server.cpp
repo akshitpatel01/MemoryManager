@@ -3,11 +3,11 @@
 #include "registration_apis.grpc.pb.h"
 #include <grpcpp/support/status.h>
 
-using registration_apis::Register;
+using registration_apis::Registeration;
 
-class Impl: public Register::Service {
+class Impl: public Registeration::Service {
     public:
-        grpc::Status reg_node (grpc::ServerContext* _context, const registration_apis::node_reg* _reg_struct, registration_apis::node_reg_rsp* _ret_struct)
+        grpc::Status register_node_db(grpc::ServerContext* _context, const registration_apis::request* _request, registration_apis::response* _response) override
         {
             return grpc::Status::OK;
         }

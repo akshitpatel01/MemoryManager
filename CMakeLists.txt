@@ -24,15 +24,19 @@ target_include_directories(library_blob_manager
                             ${CMAKE_INCLUDE_PATH}
                             libs/hash/include
                             ${ProtobufIncludePath} 
-                            ${_gRPC_PROTO_GENS_DIR}
+                            ${GRPC_INC_DIRS}
                           )
 target_sources(library_blob_manager 
                 PRIVATE
                 PUBLIC
                     ${SRC}
                     ${CMAKE_INCLUDE_PATH}
-                    ${_gRPC_PROTO_GENS_DIR}
+                    ${GRPC_INC_DIRS}
               )
+target_link_libraries(library_blob_manager
+                        PUBLIC
+                        reg_proto_lib
+                        )
 # test
 
 set(exec blob_manager)
@@ -42,5 +46,4 @@ target_link_libraries(${exec}
                         PRIVATE
                         library_hash
                         library_blob_manager
-                        reg_proto_lib
                     )

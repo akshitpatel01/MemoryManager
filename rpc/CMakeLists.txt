@@ -33,7 +33,7 @@ set(protobuf_WITH_ZLIB ON CACHE BOOL "" FORCE)
 FetchContent_GetProperties(protobuf)
 if(NOT protobuf_POPULATED)
     FetchContent_Populate(protobuf)
-    set(PROTOBUF_ROOT_DIR "${protobuf_SOURCE_DIR}")
+    set(PROTOBUF_ROOT_DIR "${protobuf_SOURCE_DIR}" CACHE INTERNAL "")
 endif()
 
 
@@ -84,7 +84,7 @@ if(NOT TARGET protoc)
 endif()
 set(_gRPC_PROTOBUF_PROTOC_EXECUTABLE $<TARGET_FILE:protoc>)
 
-set(_gRPC_PROTO_GENS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gens CACHE INTERNAL "")
+set(_gRPC_PROTO_GENS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gens)
 file(MAKE_DIRECTORY ${_gRPC_PROTO_GENS_DIR})
 set(_gRPC_PROTOBUF_WELLKNOWN_INCLUDE_DIR "${protobuf_SOURCE_DIR}/src")
 
@@ -121,6 +121,7 @@ function(target_add_protobuf target)
             message(FATAL_ERROR "Can not find target grpc_cpp_plugin")
         endif()
         set(_gRPC_CPP_PLUGIN $<TARGET_FILE:grpc_cpp_plugin>)
+        message(grpc_cpp_plugin)
 
         add_custom_command(
         OUTPUT  "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.cc"
@@ -155,15 +156,21 @@ function(target_add_protobuf target)
     endforeach()
 endfunction()
 
+set (GRPC_INC_DIRS ${_gRPC_PROTO_GENS_DIR} ${_gRPC_PROTOBUF_WELLKNOWN_INCLUDE_DIR} ${grpc_SOURCE_DIR}/include ${grpc_SOURCE_DIR}/third_party/abseil-cpp CACHE INTERNAL "")
+
 set (SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set (INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set (PROTO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/proto_files)
 file(GLOB SRC ${SRC_DIR}/**) 
 file(GLOB PROTO_SRC ${PROTO_DIR}/**)
 
-add_library(test ${SRC})
-target_add_protobuf(test ${PROTO_SRC})
-target_include_directories(test
+add_library(reg_proto_lib ${SRC})
+target_add_protobuf(reg_proto_lib ${PROTO_SRC})
+target_include_directories(reg_proto_lib
                             PUBLIC
                             ${INC_DIR}
                             gens/proto_files)
+target_link_libraries(reg_proto_lib
+                            PUBLIC
+                            grpc++
+                     )

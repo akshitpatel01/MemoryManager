@@ -4,6 +4,7 @@
 #include "rpc.h"
 #include "types.h"
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <tuple>
 #include <unordered_map>
@@ -23,6 +24,7 @@ class Central_manager {
                 m_node_map.emplace(std::piecewise_construct,
                         std::forward_as_tuple(__nID),
                         std::forward_as_tuple(__nID, _ip));
+                //m_node_map[__nID] = node_db_map{__nID, _ip};
             }
             return __nID;
         }
@@ -74,7 +76,7 @@ class Central_manager {
         {
             switch (_action) {
                 case NODE_ADD:
-                    _db_snap.m_node = {reg_node(_db_snap.m_node.m_ip_addr)};
+                    _db_snap.m_node = {reg_node(_db_snap.m_node.m_ip_addr), _db_snap.m_node.m_ip_addr};
                     break;
                 case NODE_REM:
                     return rem_node(_db_snap.m_node.m_id);
@@ -93,8 +95,7 @@ class Central_manager {
     public:
         Central_manager(RPC_helper& m_rpc_helper)
         {
-            /* register cb in rpc_helper
-             */
+            m_rpc_helper.register_push_cbs(std::bind(&Central_manager::register_event_handler, this, std::placeholders::_1, std::placeholders::_2));
         }
 
     private:

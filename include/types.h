@@ -15,6 +15,9 @@ struct node_meta_t {
     uint32_t m_ip_addr;
 
     node_meta_t() = default;
+    node_meta_t(uint32_t _id, uint32_t _ip)
+        :m_id(_id), m_ip_addr(_ip)
+    {}
 };
 
 struct db_meta_t {
@@ -33,7 +36,7 @@ struct node_db_map {
     }
     template<typename... ArgsType>
     node_db_map(ArgsType&&... args)
-        :m_node(std::forward(args...)), m_dbs()
+        :m_node(std::forward<ArgsType>(args)...), m_dbs()
     {
     }
 
@@ -65,7 +68,7 @@ struct db_snapshot_t {
 };
 
 enum action_t {
-    NODE_ADD = 1,
+    NODE_ADD = 0,
     DB_ADD,
     NODE_REM,
     DB_REM

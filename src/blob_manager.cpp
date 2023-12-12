@@ -1,16 +1,4 @@
-#include "blob_manager.h"
-#include "segment.h"
-#include <algorithm>
-#include <bits/types/FILE.h>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <string>
-
+#if 0
 Blob_manager::Blob_manager()
     : m_global_node_id(1), m_global_db_id(1), m_free_list_node([](void* _a, void* _b)-> bool {
                 uint32_t* __id1 = static_cast<uint32_t*>(_a);
@@ -235,3 +223,4 @@ Blob_manager::__populate_db_list(std::set<T>& _s, typename std::set<T>::iterator
 
     return true;
 }
+#endif

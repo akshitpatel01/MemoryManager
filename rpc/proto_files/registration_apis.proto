@@ -1,31 +1,24 @@
-#include "google/protobuf/stubs/port.h"
 syntax = "proto3";
 
 package registration_apis;
 
-message reg_mssg {
-    uint32 ip = 1;
-    uint32 node_id = 1;
-}
-
-message reg_rsp {
-    uint32 id = 1;
-}
-
-message reg_rem_mssg {
-    uint32 id = 1;
-}
 enum Reg_action {
-    REG_NODE = 1,
-    REG_DB = 2,
-    REM_NODE = 3,
-    REM_DB = 4,
+    REG_NODE = 0;
+    REG_DB = 1;
+    REM_NODE = 2;
+    REM_DB = 3;
 };
+message request {
+    uint32 ip = 1;
+    uint32 node_id = 2;
+    Reg_action action = 3;
+}
 
-service Register {
-    rpc reg_node(reg_mssg, Reg_action) returns (reg_rsp);
-    rpc reg_db(reg_mssg, Reg_action) returns (reg_rsp);
+message response {
+    uint32 id = 1;
+    bool rsp = 2;
+}
 
-    rpc rem_node(reg_rem_mssg, Reg_action) return (bool);
-    rpc rm_db(reg_rem_mssg, Reg_action) return (bool);
+service Registeration {
+    rpc register_node_db(request) returns (response) {}
 }
