@@ -3,9 +3,12 @@
 
 #include "rpc.h"
 #include "types.h"
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <link.h>
+#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -13,6 +16,8 @@
 /* Dependency: RPC
  */
 class Central_manager {
+    private:
+        std::thread t1;
     private:
         /* Registration APIs handler
          */
@@ -91,16 +96,39 @@ class Central_manager {
 
             return true;
         }
+        void dump_all_meta()
+        {
+            for (;;) {
+                std::cout << "Dumping node map\n";
+                for (auto& n_map: m_node_map) {
+                    std::cout << "Node ID:" << n_map.first << "\n";
+                    std::cout << n_map.second << "\n";
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+            }
+        }
+        void periodic_meta_dump()
+        {
+            t1 = std::thread(&Central_manager::dump_all_meta, this);
+        }
 
     public:
-        Central_manager(RPC_helper& m_rpc_helper)
+        Central_manager(RPC_helper& m_rpc_helper, bool debug = false)
         {
             m_rpc_helper.register_push_cbs(std::bind(&Central_manager::register_event_handler, this, std::placeholders::_1, std::placeholders::_2));
+            if (debug) {
+                periodic_meta_dump();
+            }
+        }
+        ~Central_manager()
+        {
+            std::cout << "Central manager destroyed\n";
+            t1.join();
         }
 
     private:
         std::unordered_map<pType::node_ID, node_db_map> m_node_map;
         std::unordered_map<pType::db_ID, node_db_map*> m_db_map;
-        ID_helper<pType::node_ID> m_node_id_helper;
-        ID_helper<pType::db_ID> m_db_id_helper;
+        ID_helper<pType::node_ID> m_node_id_helper{50};
+        ID_helper<pType::db_ID> m_db_id_helper{500};
 };

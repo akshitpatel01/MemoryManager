@@ -22,3 +22,16 @@ message response {
 service Registeration {
     rpc register_node_db(request) returns (response) {}
 }
+
+message db_rsp {
+    bool rsp = 1;
+}
+message add_meta {
+    uint32 id = 1;
+    uint32 data_size = 4;
+    string file_name = 2;
+    bytes data = 3;
+}
+service db_update {
+    rpc add(add_meta) returns (db_rsp) {}
+}

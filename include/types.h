@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
@@ -58,9 +59,20 @@ struct node_db_map {
 
         return false;
     }
+    friend std::ostream& operator<< (std::ostream& stream, const node_db_map& _map)
+    {
+        stream << "NodeId: " << _map.m_node.m_id << "\n";
+        stream << "NodeIP: " << _map.m_node.m_ip_addr << "\n";
+        for (auto& it: _map.m_dbs) {
+            stream << "DBID: " << it.m_id << "\n";
+        }
+
+        return stream;
+    }
     ~node_db_map()
     {}
 };
+
 
 struct db_snapshot_t {
     node_meta_t m_node;
@@ -85,7 +97,10 @@ class ID_helper {
         T m_max_id;
         T m_cur_id;
     public:
-        ID_helper() = default;
+        ID_helper(T _max_id)
+            :m_max_id(_max_id), m_cur_id{1}
+        {
+        }
 
         T get_id()
         {
