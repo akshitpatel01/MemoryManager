@@ -5,6 +5,9 @@
 #include <ostream>
 #include <string>
 #include <thread>
+#include "grpcpp/create_channel.h"
+#include "grpcpp/security/credentials.h"
+#include "rpc.h"
 #include "scope_profiler.h"
 #include <future>
 #include <vector>
@@ -36,6 +39,7 @@ void cleanup(node_manager& test)
 
 int main(int argc, char** argv)
 {
+    /*
     int i = 0;
     node_manager node_mgr = node_manager();
     char data[] = "hehehe";
@@ -55,6 +59,7 @@ int main(int argc, char** argv)
         }
         argv++;
     }
+    */
     /*node_manager test{};
     std::string db1 = "test2";
     test.add_db(db1);
@@ -63,4 +68,9 @@ int main(int argc, char** argv)
     //test2(test);
     //*/
     //const char *data = "hehehehhehe\n";
+    RPC_helper* m_rpc = new gRPC(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
+
+    auto n = m_rpc->register_node();
+    m_rpc->register_db(n);
+    m_rpc->wait();
 }

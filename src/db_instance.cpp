@@ -112,7 +112,7 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
         //auto test1 = segment_view["test"];
 
         //std::cout << "testing: " << test1.get_int64().value << "\n";
-        return segment::create_shared(
+        return segment::create_segment(
                 (void*)(__segment.get_binary().bytes),
                 (uint64_t)__segment_len.get_int64().value,
                 s.c_str(),

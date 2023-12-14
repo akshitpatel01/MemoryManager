@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package registration_apis;
+
+enum Reg_action {
+    REG_NODE = 0;
+    REG_DB = 1;
+    REM_NODE = 2;
+    REM_DB = 3;
+};
+message request {
+    uint32 ip = 1;
+    uint32 node_id = 2;
+    Reg_action action = 3;
+}
+
+message response {
+    uint32 id = 1;
+    bool rsp = 2;
+}
+
+service Registeration {
+    rpc register_node_db(request) returns (response) {}
+}
+
+message db_rsp {
+    bool rsp = 1;
+}
+message add_meta {
+    uint32 id = 1;
+    uint32 data_size = 4;
+    string file_name = 2;
+    bytes data = 3;
+}
+service Db_update {
+    rpc add(add_meta) returns (db_rsp) {}
+}

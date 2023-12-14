@@ -7,3 +7,8 @@ CMakeFiles/
 *.a
 .cache/
 utils/
+_deps/
+gens/
+protos/
+CPack*
+http_archives/
