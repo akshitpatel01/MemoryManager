@@ -1,13 +1,11 @@
 #pragma once
 
-#include "bsoncxx/types.hpp"
 #include "hash.h"
 #include "list.h"
 #include "segment.h"
 #include "db_instance.h"
 #include "mongocxx/collection.hpp"
 #include "mongocxx/database.hpp"
-#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -19,7 +17,6 @@
 #include <mongocxx/stdx.hpp>
 #include <mongocxx/uri.hpp>
 #include <sys/types.h>
-#include <utility>
 
 #define MONGO_DB "test200"
 #define MONGO_COLL "global_coll"
@@ -27,6 +24,7 @@
 #define MAX_DBS 10
 
 class node_manager {
+    using segment_t = segment<char>;
     private:
         Hash<Hash_linear, db_instance, uint32_t> m_db_hash;
         List m_db_list;
@@ -37,12 +35,9 @@ class node_manager {
     public:
         node_manager();
         bool add_db(std::string& db_name);
-        bool insert(uint32_t _db_id, const char* file_name, uint32_t _segment_id,
-                    void* _segment_data, size_t _segment_size);
-        std::shared_ptr<segment> lookup(uint32_t _db_id, const char* _file_name,
-                                        uint32_t _segment_id);
-        bool remove(uint32_t _db_id, const char* _file_name,
-                    uint32_t _segment_id);
+        bool insert(std::unique_ptr<segment_t>&& _segment, uint32_t _db_id);
+        std::unique_ptr<node_manager::segment_t> lookup(const char* _file_name, uint32_t _segment_id, uint32_t _db_id);
+        bool remove(const char* _file_name, uint32_t _segment_id, uint32_t _db_id);
         void sync_segment();
         std::string test();
         void del_all(uint32_t db_id);

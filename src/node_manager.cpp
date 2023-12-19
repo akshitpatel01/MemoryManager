@@ -1,16 +1,7 @@
 #include "node_manager.h"
 #include "db_instance.h"
 #include "list.h"
-#include <cassert>
-#include <cstddef>
 #include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <filesystem>
-#include <iostream>
-#include <iterator>
-#include <memory>
 #include <string>
 #include <sys/types.h>
 
@@ -75,23 +66,21 @@ node_manager::del_all(uint32_t _db_id)
 {
 }
 bool 
-node_manager::insert(uint32_t _db_id, const char* _file_name, uint32_t _segment_id,
-                        void* _segment_data, size_t _segment_size)
+node_manager::insert(std::unique_ptr<segment_t>&& _segment, uint32_t _db_id)
 {
     db_instance* __db = nullptr;
 
     if ((__db = m_db_hash.lookup(&_db_id))) {
-        return __db->insert_segment(_file_name, _segment_id, _segment_data,
-                                    _segment_size);
+        return __db->insert_segment(_segment->get_file_name().data(), _segment->get_id(), _segment->get_data(),
+                                    _segment->get_len());
     } else {
         std::cout << "Database not present\n";
         return false;
     }
 }
 
-std::shared_ptr<segment>
-node_manager::lookup(uint32_t _db_id, const char* _file_name,
-                     uint32_t _segment_id)
+std::unique_ptr<node_manager::segment_t>
+node_manager::lookup(const char* _file_name, uint32_t _segment_id, uint32_t _db_id)
 {
     db_instance* __db = nullptr;
 
@@ -103,8 +92,7 @@ node_manager::lookup(uint32_t _db_id, const char* _file_name,
     }
 }
 bool
-node_manager::remove(uint32_t _db_id, const char* _file_name,
-                    uint32_t _segment_id)
+node_manager::remove(const char* _file_name, uint32_t _segment_id, uint32_t _db_id)
 {
     db_instance* __db = nullptr;
 

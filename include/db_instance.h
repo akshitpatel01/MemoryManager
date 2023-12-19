@@ -11,6 +11,7 @@
 #include <string>
 
 class db_instance {
+    using segment_t = segment<char>;
     private:
         std::string m_name;
         uint32_t m_id;
@@ -30,9 +31,9 @@ class db_instance {
         uint32_t get_id_offset();
 
     public:
-        bool insert_segment(const char* file_name, uint32_t _segment_id, void* _segment_data,
+        bool insert_segment(const char* file_name, uint32_t _segment_id, const void* _segment_data,
                             size_t _segment_size);
-        std::shared_ptr<segment> lookup_segment(const char* _file_name, uint32_t _segment_id);
+        std::unique_ptr<segment_t> lookup_segment(const char* _file_name, uint32_t _segment_id);
         bool remove_segment(const char* _file_name, uint32_t _segment_id);
         void del_all();
 

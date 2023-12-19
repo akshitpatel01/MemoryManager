@@ -1,41 +1,11 @@
-#include <chrono>
-#include <future>
-#include <iostream>
+#include <functional>
 #include <memory>
-#include <ostream>
-#include <string>
-#include <thread>
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
 #include "rpc.h"
-#include "scope_profiler.h"
-#include <future>
-#include <vector>
 #include "node_manager.h"
 
 #define NUMBER 8000
-void test2(node_manager& test)
-{
-    PROFILE_SCOPE();
-    for(int i = 0; i < NUMBER*10; i++) {
-        if (test.lookup(1, (std::string("file")+ std::to_string(i)).c_str(), i) == nullptr) {
-            //std::cout << "lookup failed\n";
-        }
-    }
-}
-void test1(node_manager& test)
-{
-    PROFILE_SCOPE();
-    for(int i = 0; i < NUMBER; i++) {
-        test.insert(1, (std::string("file")+ std::to_string(i)).c_str(), i, (void*)"heheheiiii", 11);
-    }
-}
-void cleanup(node_manager& test)
-{
-
-    std::string db1 = "test1";
-    test.del_all(1);
-}
 
 int main(int argc, char** argv)
 {
@@ -68,7 +38,12 @@ int main(int argc, char** argv)
     //test2(test);
     //*/
     //const char *data = "hehehehhehe\n";
-    RPC_helper* m_rpc = new gRPC(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
+    node_manager manager{};
+    std::string db1 = "test5";
+    manager.add_db(db1);
+    RPC_helper* m_rpc = new gRPC(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()), std::bind(&node_manager::insert, &manager, std::placeholders::_1, std::placeholders::_2),
+                                                                                                                std::bind(&node_manager::lookup, &manager, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                                                                                                                std::bind(&node_manager::remove, &manager, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     auto n = m_rpc->register_node();
     m_rpc->register_db(n);

@@ -1,9 +1,9 @@
 #include <cassert>
 #include <cstdint>
+#include <memory>
 #include "db_instance.h"
 
 using bsoncxx::builder::basic::kvp;
-using bsoncxx::builder::basic::make_array;
 using bsoncxx::builder::basic::make_document;
 
 uint32_t
@@ -45,7 +45,7 @@ db_instance::db_instance(std::string&& _db_name,
 }
 
 bool
-db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, void* _segment_data,
+db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const void* _segment_data,
                             size_t _segment_size)
 {
 
@@ -91,10 +91,10 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, void* 
     return true;
 }
 
-std::shared_ptr<segment>
+std::unique_ptr<db_instance::segment_t>
 db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
 {
-    std::shared_ptr<segment> __ret_segment;
+    std::unique_ptr<segment_t> __ret_segment;
 
     auto __lookup_segment = m_collection.find_one(make_document(
                 kvp("m_segment_id", bsoncxx::types::b_int64{_segment_id}),
@@ -112,8 +112,8 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
         //auto test1 = segment_view["test"];
 
         //std::cout << "testing: " << test1.get_int64().value << "\n";
-        return segment::create_segment(
-                (void*)(__segment.get_binary().bytes),
+        return segment_t::create_segment(
+                (char*)(__segment.get_binary().bytes),
                 (uint64_t)__segment_len.get_int64().value,
                 s.c_str(),
                 (uint32_t)__segment_id.get_int64().value

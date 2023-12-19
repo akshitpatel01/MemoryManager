@@ -4,7 +4,7 @@
 #include <functional>
 #include <grpcpp/support/status.h>
 #include <memory>
-#include <vector>
+#include <sys/types.h>
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "registration_apis.grpc.pb.h"
@@ -12,6 +12,11 @@
 #include "segment.h"
 #include <thread>
 class RPC_helper {
+    protected:
+        using segment_t = segment<char>;
+        using add_cb = std::function<bool(std::unique_ptr<segment_t>&&, uint32_t)>;
+        using lookup_cb = std::function<std::unique_ptr<segment_t>(const char*, uint32_t, uint32_t)>;
+        using del_cb = std::function<bool(const char*, uint32_t, uint32_t)>;
     public:
         uint32_t register_db(uint32_t _id)
         {
@@ -21,25 +26,28 @@ class RPC_helper {
         {
             return _register_node();
         }
-        /* Callbacks to be invoked on receiving add/del/lookup notifs
-         */
-        bool register_cbs();
         virtual void wait(){}
     private:
         virtual uint32_t _register_db(uint32_t) = 0;
         virtual uint32_t _register_node() = 0;
-        virtual bool _register_cb(std::function<bool(std::shared_ptr<segment>)>&& _cb) = 0;
 };
 
-class gRPC: public RPC_helper, registration_apis::Db_update::Service {
+class gRPC: public RPC_helper, registration_apis::db_update::Service {
     private:
+        using add_cb = typename RPC_helper::add_cb;
+        using lookup_cb = typename RPC_helper::lookup_cb;
+        using del_cb = typename RPC_helper::del_cb;
+        using segment_t = typename RPC_helper::segment_t;
+
         std::unique_ptr<registration_apis::Registeration::Stub> stub_;
-        std::vector<std::function<bool(std::shared_ptr<segment>)>> m_cbs;
+        add_cb m_add_cb;
+        lookup_cb m_lookup_cb;
+        del_cb m_del_cb;
         std::thread server_thread;
         
     public:
-        gRPC(std::shared_ptr<grpc::ChannelInterface> channel)
-            :stub_(registration_apis::Registeration::NewStub(channel)), m_cbs(), server_thread(&gRPC::start_server, this)
+        gRPC(std::shared_ptr<grpc::ChannelInterface> channel, add_cb&& _add_cb, lookup_cb&& _lookup_cb, del_cb&& _del_cb)
+            :stub_(registration_apis::Registeration::NewStub(channel)), m_add_cb(_add_cb), m_lookup_cb(_lookup_cb), m_del_cb(_del_cb), server_thread(&gRPC::start_server, this)
         {}
         ~gRPC()
         {
@@ -102,27 +110,40 @@ class gRPC: public RPC_helper, registration_apis::Db_update::Service {
         }
 
     private:
-        bool _register_cb(std::function<bool(std::shared_ptr<segment>)>&& _cb) override
+        bool _notify_add_cbs(std::unique_ptr<segment_t>&& _segment, uint32_t _id)
         {
-            m_cbs.push_back(_cb);
-            return true;
-        }
-        bool notify_cbs(std::shared_ptr<segment> _segment)
-        {
-            bool _ret = true;
             std::cout << "triggered all db cbs\n";
             
-            for (auto& _func: m_cbs) {
-                _ret &= _func(_segment);
-            }
-
-            return _ret;
+            return m_add_cb(std::move(_segment), _id);
+        }
+        std::unique_ptr<segment_t> notify_lookup_cbs(const char* _file_name, uint32_t _seg_id, uint32_t _db_id)
+        {
+            return m_lookup_cb(_file_name, _seg_id, _db_id); 
+        }
+        bool notify_del_cbs(uint32_t _seg_id, uint32_t _db_id)
+        {
+            return true;
         }
         grpc::Status add(grpc::ServerContext* _context, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret;
-            _ret = notify_cbs(segment::create_segment(_add_req->data().data(), _add_req->data().length(), _add_req->file_name().c_str()));
+            char *c = new char[sizeof(_add_req->data().length())];
+            memcpy(c, _add_req->data().data(), _add_req->data().length());
+            _ret = _notify_add_cbs(segment_t::create_segment(c, _add_req->data().length(), _add_req->file_name().c_str()), _add_req->db_id());
             _rsp->set_rsp(_ret);
             return grpc::Status::OK; 
+        }
+        grpc::Status lookup(grpc::ServerContext* _context, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_lookup_rsp* _rsp) override
+        {
+            bool _ret = false;
+            auto seg_ptr = notify_lookup_cbs(_lookup_req->file_name().c_str(), _lookup_req->seg_id(), _lookup_req->db_id());
+
+            if (seg_ptr) {
+                _rsp->set_data(seg_ptr->get_data(), seg_ptr->get_len());
+                _ret = true;
+            }
+
+            _rsp->set_rsp(_ret);
+            return grpc::Status::OK;
         }
 };
