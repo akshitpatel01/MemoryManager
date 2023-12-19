@@ -6,11 +6,13 @@
 #include <memory>
 #include <string_view>
 
+static ID_helper<uint32_t> m_seg_id_helper{5000000};
 template <typename data_t>
 class segment {
-    using pointer_t = std::unique_ptr<data_t>;
+    using pointer_t = data_t*;
+    using unique_pointer_t = std::unique_ptr<data_t>;
     private:
-        pointer_t m_data;
+        unique_pointer_t m_data;
         uint32_t m_len;
         std::string_view m_file_path; 
         pType::segment_ID m_segment_id;
@@ -20,9 +22,9 @@ class segment {
         friend class db_instance;
     private:
         explicit segment(pointer_t _data, uint32_t _data_len, std::string_view _file_path,
-                    uint32_t _segment_id) noexcept
-            : m_data(std::make_unique(_data)), m_len(_data_len), m_file_path(_file_path),
-              m_segment_id(_segment_id)
+                    uint32_t _segment_id = m_seg_id_helper.get_id()) noexcept
+            : m_data(std::unique_ptr<data_t>(_data)), m_len(_data_len), m_file_path(_file_path),
+              m_segment_id(_segment_id), m_hash(Hashfn<pType::segment_ID, 1>{}(_segment_id)[0])
         {
         }
 
@@ -44,5 +46,15 @@ class segment {
         std::size_t get_hash()
         {
             return m_hash;
+        }
+
+        std::string_view get_file_name()
+        {
+            return m_file_path;
+        }
+
+        void const * get_data()
+        {
+            return m_data.get();
         }
 };

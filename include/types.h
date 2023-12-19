@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <iostream>
+#include <random>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
@@ -26,6 +29,8 @@ struct db_meta_t {
 };
 
 #define DEFAULT_DBS_PER_NODE 10
+#define SEGMENT_SIZE 1000000
+#define REPLICATION_FACTOR 2
 struct node_db_map {
     node_meta_t m_node;
     std::vector<db_meta_t> m_dbs;
@@ -119,5 +124,56 @@ class ID_helper {
         void free_id(T& _id)
         {
             m_free_list.push_back(_id);
+        }
+};
+
+inline size_t hash_combine( size_t lhs, size_t rhs) {
+    if constexpr (sizeof(size_t) >= 8) {
+        lhs ^= rhs + 0x517cc1b727220a95 + (lhs << 6) + (lhs >> 2);
+    } else {
+        lhs ^= rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2);
+    }
+    return lhs;
+}
+
+template<typename K, typename V>
+class std::hash<std::pair<K,V>> {
+    public:
+    size_t operator() (std::pair<K,V>& _obj)
+    {
+        return hash_combine(std::hash<K>{}(_obj.first), std::hash<V>{}(_obj.second));
+    }
+};
+template <typename T, size_t N>
+class Hashfn {
+    public:
+    std::array<size_t, N> operator() (T& key)
+   {
+       std::minstd_rand0 rng(std::hash<T>{}(key));
+       std::array<std::size_t, N> hashes;
+       std::generate(std::begin(hashes), std::end(hashes), rng);
+       return hashes;
+   }
+};
+
+template<size_t N>
+class Hashfn<void*, N> {
+    uint64_t m_offset = 14695981039346656037U;
+    uint64_t m_prime = 1099511628211;
+    public:
+        std::array<size_t, N> operator() (void* _data, size_t _size)
+        {
+            size_t _hash = m_offset; 
+            size_t i = 0;
+
+            for (; i < _size; i++) {
+                _hash ^= static_cast<char*>(_data)[i];
+                _hash *= m_prime;
+            }
+
+            std::minstd_rand0 rng(_hash);
+            std::array<std::size_t, N> hashes;
+            std::generate(std::begin(hashes), std::end(hashes), rng);
+            return hashes;
         }
 };

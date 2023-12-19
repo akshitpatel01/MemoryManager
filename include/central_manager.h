@@ -12,6 +12,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /* Dependency: RPC
  */
@@ -125,10 +126,26 @@ class Central_manager {
             std::cout << "Central manager destroyed\n";
             t1.join();
         }
+        bool register_db_update_cb(std::function<bool(db_meta_t& _db, bool _add)>&& _cb)
+        {
+            m_db_cbs.push_back(std::move(_cb));
+
+            return true;
+        }
+        db_snapshot_t get_db_snap(pType::db_ID& _dbID)
+        {
+            auto it = m_db_map.find(_dbID);
+            if (it == m_db_map.end()) {
+                return db_snapshot_t{};
+            }
+
+            return db_snapshot_t{it->second->m_node, db_meta_t{_dbID}};
+        }
 
     private:
         std::unordered_map<pType::node_ID, node_db_map> m_node_map;
         std::unordered_map<pType::db_ID, node_db_map*> m_db_map;
         ID_helper<pType::node_ID> m_node_id_helper{50};
         ID_helper<pType::db_ID> m_db_id_helper{500};
+        std::vector<std::function<bool(db_meta_t& _db, bool _add)>> m_db_cbs;
 };
