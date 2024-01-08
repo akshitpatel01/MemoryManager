@@ -40,12 +40,17 @@ int main(int argc, char** argv)
     //const char *data = "hehehehhehe\n";
     node_manager manager{};
     std::string db1 = "test5";
+    std::string db2 = "test4";
     manager.add_db(db1);
+    manager.add_db(db2);
+    manager.del_all(1); 
+    manager.del_all(2); 
     RPC_helper* m_rpc = new gRPC(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()), std::bind(&node_manager::insert, &manager, std::placeholders::_1, std::placeholders::_2),
                                                                                                                 std::bind(&node_manager::lookup, &manager, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
                                                                                                                 std::bind(&node_manager::remove, &manager, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     auto n = m_rpc->register_node();
+    m_rpc->register_db(n);
     m_rpc->register_db(n);
     m_rpc->wait();
 }

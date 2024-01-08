@@ -35,7 +35,7 @@ class node_manager {
     public:
         node_manager();
         bool add_db(std::string& db_name);
-        bool insert(std::unique_ptr<segment_t>&& _segment, uint32_t _db_id);
+        bool insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id);
         std::unique_ptr<node_manager::segment_t> lookup(const char* _file_name, uint32_t _segment_id, uint32_t _db_id);
         bool remove(const char* _file_name, uint32_t _segment_id, uint32_t _db_id);
         void sync_segment();

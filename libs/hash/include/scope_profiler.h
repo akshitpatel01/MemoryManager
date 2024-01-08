@@ -1,12 +1,8 @@
 #pragma once
-#include <algorithm>
-#include <cstdint>
 #include <iostream>
 #include <ostream>
-#include <ratio>
 #include <string>
 #include <chrono>
-#include <ctime>
 
 #define PROFILE_SCOPE() Scope_profiler profiler(__FUNCTION__)
 

@@ -179,7 +179,7 @@ file(GLOB PROTO_SRC ${PROTO_DIR}/**)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS")
 #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS")
-#set (CMAKE_BUILD_TYPE Debug)
+set (CMAKE_BUILD_TYPE Release)
 #set (SOURCE_DIR src/)
 
 file(GLOB SRC ${SRC_DIR}/**) 
@@ -207,7 +207,7 @@ set(exec node_manager)
 add_executable(${exec}
                 Main.cpp)
 target_add_protobuf(${exec} ${PROTO_SRC})
-target_compile_options(${exec} PRIVATE -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS)
+target_compile_options(${exec} PRIVATE -g -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS)
 target_link_libraries(${exec}
                         PRIVATE
                         ${MONGOCXX_LIBRARIES}

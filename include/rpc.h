@@ -14,7 +14,7 @@
 class RPC_helper {
     protected:
         using segment_t = segment<char>;
-        using add_cb = std::function<bool(std::unique_ptr<segment_t>&&, uint32_t)>;
+        using add_cb = std::function<bool(const std::unique_ptr<segment_t>&, uint32_t)>;
         using lookup_cb = std::function<std::unique_ptr<segment_t>(const char*, uint32_t, uint32_t)>;
         using del_cb = std::function<bool(const char*, uint32_t, uint32_t)>;
     public:
@@ -47,7 +47,11 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         
     public:
         gRPC(std::shared_ptr<grpc::ChannelInterface> channel, add_cb&& _add_cb, lookup_cb&& _lookup_cb, del_cb&& _del_cb)
-            :stub_(registration_apis::Registeration::NewStub(channel)), m_add_cb(_add_cb), m_lookup_cb(_lookup_cb), m_del_cb(_del_cb), server_thread(&gRPC::start_server, this)
+            :stub_(registration_apis::Registeration::NewStub(channel)),
+             m_add_cb(std::move(_add_cb)),
+             m_lookup_cb(std::move(_lookup_cb)),
+             m_del_cb(std::move(_del_cb)),
+             server_thread(&gRPC::start_server, this)
         {}
         ~gRPC()
         {
@@ -110,11 +114,11 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         }
 
     private:
-        bool _notify_add_cbs(std::unique_ptr<segment_t>&& _segment, uint32_t _id)
+        bool _notify_add_cbs(const std::unique_ptr<segment_t>& _segment, uint32_t _id)
         {
             std::cout << "triggered all db cbs\n";
             
-            return m_add_cb(std::move(_segment), _id);
+            return m_add_cb(_segment, _id);
         }
         std::unique_ptr<segment_t> notify_lookup_cbs(const char* _file_name, uint32_t _seg_id, uint32_t _db_id)
         {
@@ -127,9 +131,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         grpc::Status add(grpc::ServerContext* _context, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret;
-            char *c = new char[sizeof(_add_req->data().length())];
-            memcpy(c, _add_req->data().data(), _add_req->data().length());
-            _ret = _notify_add_cbs(segment_t::create_segment(c, _add_req->data().length(), _add_req->file_name().c_str()), _add_req->db_id());
+            _ret = _notify_add_cbs(segment_t::create_segment((char*)_add_req->data().data(), _add_req->data().length(), _add_req->file_name().c_str()), _add_req->db_id());
             _rsp->set_rsp(_ret);
             return grpc::Status::OK; 
         }

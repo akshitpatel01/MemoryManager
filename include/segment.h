@@ -5,6 +5,7 @@
 #include <memory>
 #include <random>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 template<typename K, typename V>
@@ -119,7 +120,7 @@ class segment {
     using pointer_t = data_t*;
     using unique_pointer_t = std::unique_ptr<data_t>;
     private:
-        unique_pointer_t m_data;
+        const pointer_t m_data;
         uint32_t m_len;
         std::string_view m_file_path; 
         uint32_t m_segment_id;
@@ -130,7 +131,7 @@ class segment {
     private:
         explicit segment(pointer_t _data, uint32_t _data_len, std::string_view _file_path,
                     uint32_t _segment_id = m_seg_id_helper.get_id()) noexcept
-            : m_data(std::unique_ptr<data_t>(_data)), m_len(_data_len), m_file_path(_file_path),
+            : m_data(_data), m_len(_data_len), m_file_path(_file_path),
               m_segment_id(_segment_id), m_hash(Hashfn<uint32_t, 1>{}(_segment_id)[0])
         {
         }
@@ -140,6 +141,7 @@ class segment {
         static std::unique_ptr<segment> create_segment(T &&...args)
         {
             return std::unique_ptr<segment>(new segment(std::forward<T>(args)...));
+            //return std::make_unique<segment>(std::forward<T>(args)...);
         }
         uint32_t get_len()
         {
@@ -162,6 +164,6 @@ class segment {
 
         void const * get_data()
         {
-            return m_data.get();
+            return m_data;
         }
 };

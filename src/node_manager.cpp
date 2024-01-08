@@ -64,9 +64,17 @@ std::string node_manager::test()
 void
 node_manager::del_all(uint32_t _db_id)
 {
+    db_instance* __db = nullptr;
+
+    if ((__db = m_db_hash.lookup(&_db_id))) {
+        __db->del_all();
+    } else {
+        std::cout << "Database not present\n";
+    }
+
 }
 bool 
-node_manager::insert(std::unique_ptr<segment_t>&& _segment, uint32_t _db_id)
+node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id)
 {
     db_instance* __db = nullptr;
 
