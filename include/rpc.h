@@ -124,9 +124,9 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         {
             return m_lookup_cb(_file_name, _seg_id, _db_id); 
         }
-        bool notify_del_cbs(uint32_t _seg_id, uint32_t _db_id)
+        bool notify_del_cbs(const char* _file_name, uint32_t _seg_id, uint32_t _db_id)
         {
-            return true;
+            return m_del_cb(_file_name, _seg_id, _db_id);
         }
         grpc::Status add(grpc::ServerContext* _context, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* _rsp) override
         {
@@ -144,6 +144,13 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
                 _rsp->set_data(seg_ptr->get_data(), seg_ptr->get_len());
                 _ret = true;
             }
+
+            _rsp->set_rsp(_ret);
+            return grpc::Status::OK;
+        }
+        grpc::Status del(grpc::ServerContext* _context, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_rsp* _rsp) override
+        {
+            auto _ret = notify_del_cbs(_lookup_req->file_name().c_str(), _lookup_req->seg_id(), _lookup_req->db_id());
 
             _rsp->set_rsp(_ret);
             return grpc::Status::OK;

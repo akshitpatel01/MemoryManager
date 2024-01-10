@@ -75,6 +75,7 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
             __opts
             );
 
+    std::cout << "Inserted segment: " << _segment_id << " DBID: " << m_id << "\n";
     assert(__insert_one_result);
     /*   
          auto doc_view = doc_value.view();
@@ -103,7 +104,7 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
                 ));
 
     if (__lookup_segment) {
-        std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
+        //std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
         auto segment_view = __lookup_segment->view(); 
         auto __file_name = segment_view["m_file_name"];
         auto __segment = segment_view["m_segment_data"];
@@ -113,6 +114,7 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
         //auto test1 = segment_view["test"];
 
         //std::cout << "testing: " << test1.get_int64().value << "\n";
+        //std::cout << "Looked up segment: " << _segment_id << "\n";
         return segment_t::create_segment(
                 (char*)(__segment.get_binary().bytes),
                 (uint64_t)__segment_len.get_int64().value,
@@ -120,7 +122,8 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
                 (uint32_t)__segment_id.get_int64().value
                 );
     }
-
+    
+    std::cout << "Lookup failed for segment: " << _segment_id << " DB ID: " << m_id << "\n";
     return nullptr;
 }
 
@@ -133,7 +136,8 @@ db_instance::remove_segment(const char* _file_name, uint32_t _segment_id)
             );
 
     auto __del_one_res = m_collection.delete_one(__rem_doc.view());
-    //assert(__del_one_res->deleted_count() == 1);
+    std::cout << "del segment: " << _segment_id << "\n";
+    assert(__del_one_res->deleted_count() == 1);
 
     return true;
 }
