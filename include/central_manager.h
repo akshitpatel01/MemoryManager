@@ -48,7 +48,7 @@ class Central_manager {
                     _map->add_db(__dbID);
                     m_db_map[__dbID] = _map;
 
-                    return true;
+                    return __dbID;
                 }
             }
 
@@ -95,6 +95,7 @@ class Central_manager {
                     std::cout << "Event not supported\n";
             } 
 
+            m_db_cbs[0](_db_snap.m_db, true);
             return true;
         }
         void dump_all_meta()

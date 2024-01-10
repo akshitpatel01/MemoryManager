@@ -45,4 +45,5 @@ message db_lookup_rsp {
 service db_update {
     rpc add(add_meta) returns (db_rsp) {}
     rpc lookup(lookup_meta) returns (db_lookup_rsp) {}
+    rpc del(lookup_meta) returns (db_rsp) {}
 }

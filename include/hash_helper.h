@@ -18,6 +18,7 @@ class Hash_helper {
     public:
         Hash_helper(Central_manager& m_manager)
         {
+            tdb = 1;
             m_manager.register_db_update_cb(std::bind(&Hash_helper::handle_db_update, this, std::placeholders::_1, std::placeholders::_2));
         }
 
@@ -41,8 +42,16 @@ class Hash_helper {
             }
         }
 
+        int tdb;
         pType::db_ID get_db(size_t _hash)
         {
+            if (tdb == 1) {
+                tdb = 2;
+                return 1;
+            } else {
+                tdb = 1;
+                return 2;
+            }
            if (m_consistent_hash.size() == 0) {
                return INVALID_ID;
            }

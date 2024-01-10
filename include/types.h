@@ -30,7 +30,7 @@ struct db_meta_t {
 
 #define DEFAULT_DBS_PER_NODE 10
 #define SEGMENT_SIZE 1000000
-#define REPLICATION_FACTOR 2
+#define REPLICATION_FACTOR 20
 struct node_db_map {
     node_meta_t m_node;
     std::vector<db_meta_t> m_dbs;
