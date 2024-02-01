@@ -4,6 +4,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <sys/types.h>
 
 
 #define MULTI_THREAD
@@ -62,7 +63,7 @@ class Hash_simple {
         std::unique_ptr<m_bucket_t[]> m_tab;
         std::function<bool(void*, void*)> m_lookup_func;
         const uint32_t __universal_hash(void *key, uint size) const;
-        uint32_t m_key_size;
+        //uint32_t m_key_size;
     private:
       bool list_lookup_func(void *a, void *b) {
           m_hash_entry_t *m1 = static_cast<m_hash_entry_t *>(a);

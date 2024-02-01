@@ -15,7 +15,7 @@ void test_add(Blob_manager* _obj)
     auto seg_vector = _obj->get("test.txt");
     std::cout << seg_vector.size() << "Size\n";
     for (auto& seg: seg_vector) {
-        std::cout << "Got something!!!\n";
+        std::cout << "Got something!!! " << seg->get_len() << "\n";
         char c[seg->get_len()+1];
         memcpy(c, seg->get_data(), seg->get_len());
         c[seg->get_len()] = '\0';
@@ -35,7 +35,7 @@ void test_add(Blob_manager* _obj)
 }
 int main()
 {
-    gRPC m_rpc{grpc::CreateChannel("localhost:50052", grpc::InsecureChannelCredentials())};
+    gRPC m_rpc{};
     Central_manager m_central_manager{m_rpc, true};
     Hash_helper hash_helper{m_central_manager};
     Blob_manager blob{hash_helper, m_rpc, m_central_manager};

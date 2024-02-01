@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstring>
 #include <fstream>
+#include <grpcpp/support/status.h>
 #include <memory>
 #include <tuple>
 #include <unordered_map>
@@ -70,10 +71,14 @@ class Blob_manager {
                std::unique_ptr<segment_t> _seg = segment_t::create_segment(byte_array, diff, _file_path);
                pType::db_ID _dbID = m_hash_helper.get_db(_seg->get_hash());
 
-               if (!m_rpc_helper.add(_seg, m_central_manager.get_db_snap(_dbID))) {
+               it->second.m_segs.push_back(_seg->get_id());
+               if (!m_rpc_helper.add(std::move(_seg), m_central_manager.get_db_snap(_dbID),
+                                        [] (grpc::Status status_, registration_apis::db_rsp& reply_)
+                                        {
+                                            std::cout << "got reply yes!!!!\n";
+                                        })) {
                    return false;
                }
-               it->second.m_segs.push_back(_seg->get_id());
            } 
 
            return true;
@@ -100,14 +105,14 @@ class Blob_manager {
            return true;
        }
 
-       std::vector<std::unique_ptr<segment<registration_apis::db_lookup_rsp>>> get(const char* _file_path)
+       std::vector<std::unique_ptr<segment<registration_apis::db_rsp>>> get(const char* _file_path)
        {
-           std::vector<std::unique_ptr<segment<registration_apis::db_lookup_rsp>>> vec;
+           std::vector<std::unique_ptr<segment<registration_apis::db_rsp>>> vec;
            auto it = m_file_map.find(_file_path);
            std::string s(_file_path);
 
            if (it == m_file_map.end()) {
-               return std::vector<std::unique_ptr<segment<registration_apis::db_lookup_rsp>>>();
+               return std::vector<std::unique_ptr<segment<registration_apis::db_rsp>>>();
            }
            
            vec.reserve(it->second.m_segs.size());

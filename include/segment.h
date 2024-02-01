@@ -78,8 +78,8 @@ class segment: public segment_base<data_t> {
 };
 
 template<>
-class segment<registration_apis::db_lookup_rsp>: public segment_base<registration_apis::db_lookup_rsp> {
-    using data_t = registration_apis::db_lookup_rsp;
+class segment<registration_apis::db_rsp>: public segment_base<registration_apis::db_rsp> {
+    using data_t = registration_apis::db_rsp;
     using _base = segment_base<data_t>;
     using pointer_t = typename _base::pointer_t;
     private:

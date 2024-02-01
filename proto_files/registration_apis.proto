@@ -23,9 +23,6 @@ service Registeration {
     rpc register_node_db(request) returns (response) {}
 }
 
-message db_rsp {
-    bool rsp = 1;
-}
 message add_meta {
     uint32 id = 1;
     uint32 db_id = 5;
@@ -38,12 +35,12 @@ message lookup_meta {
     uint32 db_id = 2;
     string file_name = 3;
 }
-message db_lookup_rsp {
+message db_rsp {
     bool rsp = 1;
     bytes data = 2;
 }
 service db_update {
     rpc add(add_meta) returns (db_rsp) {}
-    rpc lookup(lookup_meta) returns (db_lookup_rsp) {}
+    rpc lookup(lookup_meta) returns (db_rsp) {}
     rpc del(lookup_meta) returns (db_rsp) {}
 }
