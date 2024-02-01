@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <functional>
 #include <future>
-#include <gnu/stubs-64.h>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -274,10 +273,10 @@ Hash_linear::__migration_internal()
         return false;
     }
 
-    int count = 0;
+    //int count = 0;
     while(__hash_iter) {
         // del && add
-        count++;
+        //count++;
         __item = static_cast<Hash_simple::hash_entry_t*>(_old_tab->iter_get_val(__hash_iter));
         __key = __item->m_key;
         __val = __item->m_val;

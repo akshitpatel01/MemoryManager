@@ -78,6 +78,7 @@ node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id
 {
     db_instance* __db = nullptr;
 
+    std::cout << "heheh\n";
     if ((__db = m_db_hash.lookup(&_db_id))) {
         return __db->insert_segment(_segment->get_file_name().data(), _segment->get_id(), _segment->get_data(),
                                     _segment->get_len());
@@ -87,6 +88,7 @@ node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id
     }
 }
 
+extern bsoncxx::document::view global_view;
 std::unique_ptr<node_manager::segment_t>
 node_manager::lookup(const char* _file_name, uint32_t _segment_id, uint32_t _db_id)
 {

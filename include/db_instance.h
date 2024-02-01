@@ -1,17 +1,12 @@
 #pragma once
 
-#include "bsoncxx/builder/basic/document.hpp"
-#include "bsoncxx/builder/basic/kvp.hpp"
-#include "bsoncxx/json.hpp"
-#include "bsoncxx/types.hpp"
 #include "mongocxx/client.hpp"
-#include "mongocxx/options/update.hpp"
 #include "segment.h"
 #include <cstdint>
 #include <string>
 
 class db_instance {
-    using segment_t = segment<char>;
+    using segment_t = segment<uint8_t*>;
     private:
         std::string m_name;
         uint32_t m_id;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hash.h"
-#include "list.h"
 #include "segment.h"
 #include "db_instance.h"
 #include "mongocxx/collection.hpp"
@@ -24,7 +23,7 @@
 #define MAX_DBS 10
 
 class node_manager {
-    using segment_t = segment<char>;
+    using segment_t = segment<uint8_t*>;
     private:
         Hash<Hash_linear, db_instance, uint32_t> m_db_hash;
         List m_db_list;

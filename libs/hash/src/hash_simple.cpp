@@ -10,7 +10,7 @@ Hash_simple::Hash_simple(uint32_t _size, std::function<bool(void*,void*)> __m_lo
                             uint32_t _key_size)
     : m_max_size(_size), m_cur_size(0),
         m_tab(std::make_unique<m_bucket_t[]>(m_max_size)),
-        m_lookup_func(__m_lookup_func), m_key_size(_key_size)
+        m_lookup_func(__m_lookup_func)//, m_key_size(_key_size)
 {
     uint i;
 

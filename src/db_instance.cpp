@@ -3,7 +3,11 @@
 #include <cstring>
 #include <memory>
 #include "db_instance.h"
+#include "bsoncxx/document/value.hpp"
+#include "bsoncxx/json.hpp"
+#include "segment.h"
 
+bsoncxx::document::view global_view;
 using bsoncxx::builder::basic::kvp;
 using bsoncxx::builder::basic::make_document;
 
@@ -96,8 +100,6 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
 std::unique_ptr<db_instance::segment_t>
 db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
 {
-    std::unique_ptr<segment_t> __ret_segment;
-
     auto __lookup_segment = m_collection.find_one(make_document(
                 kvp("m_segment_id", bsoncxx::types::b_int64{_segment_id}),
                 kvp("m_file_name", bsoncxx::types::b_string{_file_name})
@@ -106,8 +108,8 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
     if (__lookup_segment) {
         //std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
         auto segment_view = __lookup_segment->view(); 
+        global_view = segment_view;
         auto __file_name = segment_view["m_file_name"];
-        auto __segment = segment_view["m_segment_data"];
         auto __segment_len = segment_view["m_segment_len"];
         auto __segment_id = segment_view["m_segment_id"];
         std::string s{ __file_name.get_string().value};
@@ -115,12 +117,12 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
 
         //std::cout << "testing: " << test1.get_int64().value << "\n";
         //std::cout << "Looked up segment: " << _segment_id << "\n";
-        return segment_t::create_segment(
-                (char*)(__segment.get_binary().bytes),
-                (uint64_t)__segment_len.get_int64().value,
-                s.c_str(),
-                (uint32_t)__segment_id.get_int64().value
-                );
+        //char *c = new char[__segment_len.get_int64().value];
+        //memcpy(c, __segment.get_binary().bytes, __segment_len.get_int64().value);
+        return std::unique_ptr<db_instance::segment_t>(new owning_segment<bsoncxx::document::value, uint8_t*>(std::move(*__lookup_segment),
+                                                                                (uint32_t)__segment_len.get_int64().value,
+                                                                                std::move(s),
+                                                                                (uint32_t)__segment_id.get_int64().value));
     }
     
     std::cout << "Lookup failed for segment: " << _segment_id << " DB ID: " << m_id << "\n";

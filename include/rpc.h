@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <grpcpp/support/status.h>
+#include <ifaddrs.h>
 #include <memory>
 #include <sys/types.h>
 #include "grpcpp/server_builder.h"
@@ -11,9 +12,51 @@
 #include "registration_apis.pb.h"
 #include "segment.h"
 #include <thread>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+typedef enum ip_type_t_ {
+    IPV4 = AF_INET,
+    IPV6 = AF_INET6,
+    IPV46 = AF_UNSPEC
+} ip_type_t;
+
+inline uint32_t get_ifc_info(std::string& ifc_name)
+{
+    struct ifaddrs *ifaddr, *ifa;
+    char ip[INET_ADDRSTRLEN];
+    uint32_t num_ip;
+
+    if (getifaddrs(&ifaddr) == -1) 
+    {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+    {
+        if (ifa->ifa_addr == NULL)
+            continue;  
+
+        if(strcmp(ifc_name.c_str(), ifa->ifa_name) && ifa->ifa_addr->sa_family == IPV4)
+        {
+            num_ip = ((struct sockaddr_in *)(ifa->ifa_addr))->sin_addr.s_addr;
+            if (!inet_ntop(AF_INET, &num_ip, ip, INET_ADDRSTRLEN)) {
+                printf("Error in IP conversion\n");
+                return 0;
+            }
+            std::cout << ifa->ifa_name << ":" << ifa->ifa_addr << " " << ip << "\n";
+            return num_ip;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+    return 0;
+}
 class RPC_helper {
     protected:
-        using segment_t = segment<char>;
+        using segment_t = segment<uint8_t*>;
         using add_cb = std::function<bool(const std::unique_ptr<segment_t>&, uint32_t)>;
         using lookup_cb = std::function<std::unique_ptr<segment_t>(const char*, uint32_t, uint32_t)>;
         using del_cb = std::function<bool(const char*, uint32_t, uint32_t)>;
@@ -77,7 +120,8 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         {
             grpc::ClientContext context;
             registration_apis::response rsp{};
-            std::unique_ptr<registration_apis::request> req = make_req(5, 0, registration_apis::REG_NODE);
+            std::string ifc = "en0";
+            std::unique_ptr<registration_apis::request> req = make_req(get_ifc_info(ifc), 0, registration_apis::REG_NODE);
             grpc::Status status = stub_->register_node_db(&context, *req, &rsp); 
 
             if (status.ok()) {
@@ -103,7 +147,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
 
         void start_server()
         {
-            std::string server_address("0.0.0.0:50052");
+            std::string server_address("localhost:50052");
 
             grpc::ServerBuilder builder;
             builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -131,11 +175,15 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         grpc::Status add(grpc::ServerContext* _context, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret;
-            _ret = _notify_add_cbs(segment_t::create_segment((char*)_add_req->data().data(), _add_req->data().length(), _add_req->file_name().c_str()), _add_req->db_id());
+            std::string s{_add_req->file_name()};
+            const auto ptr = std::unique_ptr<segment<uint8_t*>>(new observer_segment<uint8_t>((uint8_t*)_add_req->data().data(),
+                                                                                               _add_req->data().length(),
+                                                                                               std::move(s)));
+            _ret = _notify_add_cbs(ptr, _add_req->db_id());
             _rsp->set_rsp(_ret);
             return grpc::Status::OK; 
         }
-        grpc::Status lookup(grpc::ServerContext* _context, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_lookup_rsp* _rsp) override
+        grpc::Status lookup(grpc::ServerContext* _context, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret = false;
             auto seg_ptr = notify_lookup_cbs(_lookup_req->file_name().c_str(), _lookup_req->seg_id(), _lookup_req->db_id());
