@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#define LOGS
+//#define LOGS
 template<typename K, typename V>
 class std::hash<std::pair<K,V>> {
     public:

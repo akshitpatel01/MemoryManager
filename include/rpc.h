@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <grpcpp/support/status.h>
 #include <ifaddrs.h>
 #include <memory>
@@ -15,7 +16,9 @@
 #include <thread>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <vector>
 
+        static std::atomic<uint> cnt = 0;
 typedef enum ip_type_t_ {
     IPV4 = AF_INET,
     IPV6 = AF_INET6,
@@ -142,6 +145,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         del_cb m_del_cb;
         std::thread server_thread;
         std::unique_ptr<CallbackServiceImpl> service_;
+        std::vector<std::future<void>> m_fut;
         
     public:
         gRPC(std::shared_ptr<grpc::ChannelInterface> channel, add_cb&& _add_cb, lookup_cb&& _lookup_cb, del_cb&& _del_cb)

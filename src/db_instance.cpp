@@ -117,7 +117,9 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
                 ));
 
     if (__lookup_segment) {
+#ifdef LOGS
         std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
+#endif
         auto segment_view = __lookup_segment->view(); 
         global_view = segment_view;
         auto __file_name = segment_view["m_file_name"];
