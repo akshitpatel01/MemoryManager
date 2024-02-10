@@ -11,18 +11,14 @@
 #include "registration_apis.pb.h"
 
 static ID_helper<uint32_t> m_seg_id_helper{5000000};
-/* Takes ownership and manages a pointer
+/* Template to pass around any kind of data.
+ * Takes ownership and manages a pointer
  */
 template <typename data_t>
 class segment_base {
     protected:
         using pointer_t = data_t*;
         using unique_pointer_t = std::unique_ptr<data_t>;
-        unique_pointer_t m_data;
-        uint32_t m_len;
-        std::string_view m_file_path; 
-        pType::segment_ID m_segment_id;
-        std::size_t m_hash;
 
     protected:
         explicit segment_base(unique_pointer_t&& _data_p, uint32_t _data_len, std::string_view _file_path,
@@ -61,6 +57,13 @@ class segment_base {
         {
             return m_file_path;
         }
+    protected:
+        unique_pointer_t m_data;
+        uint32_t m_len;
+        std::string_view m_file_path; 
+        pType::segment_ID m_segment_id;
+        std::size_t m_hash;
+
 };
 
 template <typename data_t>
@@ -151,74 +154,35 @@ class File {
         std::cout << "File constructed with name: " << m_name << " segments: " << m_segments.size() << " operation: " << m_operation << "\n"; 
     }
 
+    ~File()
+    {
+        wait();
+    }
+
+    public:
     /* block till the entire operation is completed
      */
     bool wait()
     {
+#ifdef LOGS
         std::cout << "Waiting for operation to complete\n";
+#endif
         std::unique_lock<std::mutex> lock_(m_condition_mutex);
         m_cv.wait(lock_, [this]{
                 return (m_op_result != in_progress);
                 });
 
+#ifdef LOGS
         std::cout << "OPertion completed\n";
+#endif
         return (m_op_result == failure) ? false : true;
     }
+
     std::string_view name()
     {
         return m_name;
     }
-
-    bool handle_operation(std::unique_ptr<segment<registration_apis::db_rsp>>&& segment, status_t status, uint32_t idx)
-    {
-        bool ret_ = false;
-        bool do_notify_ = false;
-
-        if (idx >= m_segments.size()) {
-            return ret_;
-        }
-
-        switch (m_operation) {
-            case ADD:
-            case DEL:
-                m_segments[idx].set_segment_fill(status);
-                ret_ = true;
-                break;
-            case LOOKUP:
-                ret_ = m_segments[idx].set_segment(std::move(segment));
-                break;
-        }
-
-        if (ret_) {
-#if 0
-            m_segment_latch.count_down();
-            
-            if (m_segment_latch.try_wait()) {
-                // unblock wait;
-                do_notify_ = true;
-                m_op_result = success;
-            }
-#endif
-            std::scoped_lock<std::mutex> lock_(m_condition_mutex);
-            m_filled_segments++;
-            if (m_filled_segments == m_segments.size()) {
-                // unblock wait;
-                do_notify_ = true;
-                m_op_result = success;
-            }
-        } else {
-            std::scoped_lock<std::mutex> lock_(m_condition_mutex);
-            do_notify_ = true;
-            m_op_result = failure;
-
-        }
-        if (do_notify_) {
-            std::cout << "notifying File operation done\n";
-            m_cv.notify_one();
-        }
-        return ret_;
-    }
-
+    
     bool next(iter& ptr)
     {
         bool ret_;
@@ -239,6 +203,50 @@ class File {
         return ret_;
     }
 
+
+    bool handle_operation(std::unique_ptr<segment<registration_apis::db_rsp>>&& segment, status_t status, uint32_t idx)
+    {
+        bool ret_ = false;
+        bool do_notify_ = false;
+
+        if (idx >= m_segments.size()) {
+            return ret_;
+        }
+
+        switch (m_operation) {
+            case ADD:
+            case DEL:
+                m_segments[idx].set_segment_fill(status);
+                ret_ = true;
+                break;
+            case LOOKUP:
+                ret_ = m_segments[idx].set_segment(std::move(segment), status);
+                break;
+        }
+
+        if (ret_) {
+            std::scoped_lock<std::mutex> lock_(m_condition_mutex);
+            m_filled_segments++;
+            if (m_filled_segments == m_segments.size()) {
+                // unblock wait;
+                do_notify_ = true;
+                m_op_result = success;
+            }
+        } else {
+            std::scoped_lock<std::mutex> lock_(m_condition_mutex);
+            do_notify_ = true;
+            m_op_result = failure;
+
+        }
+        if (do_notify_) {
+#ifdef LOGS
+            std::cout << "notifying File operation done\n";
+#endif
+            m_cv.notify_one();
+        }
+        return ret_;
+    }
+
     private:
         struct m_meta_internal {
             using status_t = typename File::status_t;
@@ -246,9 +254,9 @@ class File {
                 :segment_(nullptr), segment_filled(in_progress)
             {}
 
-            bool set_segment(std::unique_ptr<segment<registration_apis::db_rsp>>&& segment)
+            bool set_segment(std::unique_ptr<segment<registration_apis::db_rsp>>&& segment, status_t status_)
             {
-                if (!segment) {
+                if (!segment || status_ != success) {
                     set_segment_fill(failure);
                     return false;
                 }
@@ -301,7 +309,6 @@ class File {
         std::vector<m_meta_internal> m_segments;
         uint32_t m_iter;
         operation_t m_operation;
-        //std::latch m_segment_latch;
         uint32_t m_filled_segments{};
         std::condition_variable m_cv;
         std::mutex m_condition_mutex;

@@ -1,14 +1,16 @@
 #pragma once
 
 #include <algorithm>
+#include <arpa/inet.h>
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <netinet/in.h>
 #include <random>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
-#define LOGS
+//#define LOGS
 namespace pType {
     using segment_ID = uint32_t;
     using node_ID = uint32_t;
@@ -67,8 +69,12 @@ struct node_db_map {
     }
     friend std::ostream& operator<< (std::ostream& stream, const node_db_map& _map)
     {
+        char ip[INET_ADDRSTRLEN];
+        if (!inet_ntop(AF_INET, &_map.m_node.m_ip_addr, ip, INET_ADDRSTRLEN))
+        {
+        }
         stream << "NodeId: " << _map.m_node.m_id << "\n";
-        stream << "NodeIP: " << _map.m_node.m_ip_addr << "\n";
+        stream << "NodeIP: " << ip << "\n";
         for (auto& it: _map.m_dbs) {
             stream << "DBID: " << it.m_id << "\n";
         }

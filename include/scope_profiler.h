@@ -5,6 +5,7 @@
 #include <chrono>
 
 #define PROFILE_SCOPE() Scope_profiler profiler(__FUNCTION__)
+#define PROFILE_SCOPE_FUNC(func) Scope_profiler profiler(func)
 
 class Scope_profiler {
     private:

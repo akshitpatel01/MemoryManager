@@ -82,6 +82,7 @@ class Central_manager {
             switch (_action) {
                 case NODE_ADD:
                     _db_snap.m_node = {reg_node(_db_snap.m_node.m_ip_addr), _db_snap.m_node.m_ip_addr};
+                    return true;
                     break;
                 case NODE_REM:
                     return rem_node(_db_snap.m_node.m_id);
@@ -110,7 +111,7 @@ class Central_manager {
         }
         void periodic_meta_dump()
         {
-            //t1 = std::thread(&Central_manager::dump_all_meta, this);
+            t1 = std::thread(&Central_manager::dump_all_meta, this);
         }
 
     public:

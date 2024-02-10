@@ -9,7 +9,19 @@ services:
     command: sh blob/startup.sh
     ports:
       - 50051:50051
-      - 50052:50052
     volumes:
       - .:/blob
+
+  mongocxx:
+    image: mongodb/mongo-cxx-driver
+    hostname: mongo
+    container_name: mongo
+    stdin_open: true
+    privileged: true
+    tty: true
+    command: sh node_manager/startup.sh
+    ports:
+      - 50052:50052
+    volumes:
       - /Users/akshitpatel/utils/MemoryManager:/node_manager
+

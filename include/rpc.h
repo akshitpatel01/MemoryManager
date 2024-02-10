@@ -30,6 +30,7 @@
 #include <ifaddrs.h>
 
 #define PORT 50053
+static uint cnt = 0;
 class RPC_helper {
     protected:
         using add_cb = std::function<void(grpc::Status, registration_apis::db_rsp&)>;
@@ -41,9 +42,7 @@ class RPC_helper {
             return _register_push_cbs(std::forward<std::function<bool(db_snapshot_t&, action_t&)>>(_func));
         }
         bool add(std::unique_ptr<segment<char>>&& _segment, const db_snapshot_t& _db, add_cb&& cb_) {
-            //return _add(_segment, _db, std::move(cb_));
-            _add_segment(std::move(_segment), _db, std::move(cb_));
-            return true;
+            return _async_add(std::move(_segment), _db, std::move(cb_));
         }
         bool del(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, del_cb&& cb)
         {
@@ -51,24 +50,36 @@ class RPC_helper {
         }
         bool lookup(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, async_lookup_cb&& cb_)
         {
-            //return _lookup(_file_name, _segment_id, _db);
-
-            return _lookup_segment(_file_name, _segment_id, _db, std::move(cb_));
+            return _async_lookup(_file_name, _segment_id, _db, std::move(cb_));
         }
 
     private:
         virtual bool _register_push_cbs(std::function<bool(db_snapshot_t&, action_t&)>&&) = 0;
         virtual bool _add(std::unique_ptr<segment<char>>& _segment, const db_snapshot_t& _db, add_cb&& cb_) = 0;
-        virtual void _add_segment(std::unique_ptr<segment<char>>&& _segment, const db_snapshot_t& _db, add_cb&& cb_) = 0;
+        virtual bool _async_add(std::unique_ptr<segment<char>>&& _segment, const db_snapshot_t& _db, add_cb&& cb_) = 0;
         virtual bool _del(std::string& _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db) = 0;
         virtual bool _async_del(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, del_cb&& cb) = 0;
         virtual std::unique_ptr<segment<registration_apis::db_rsp>> _lookup(std::string& _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db) = 0;
-        virtual bool _lookup_segment(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, async_lookup_cb&& cb) = 0;
+        virtual bool _async_lookup(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, async_lookup_cb&& cb) = 0;
 };
 
 class gRPC: public RPC_helper, registration_apis::Registeration::Service {
+    public:
+        gRPC()
+            :server_thread(&gRPC::start_server, this)
+        {
+            m_registration_cbs.reserve(5);
+        }
+        ~gRPC()
+        {
+            std::cout << "Grpc destroyed\n";
+        }
+    /* grpc Registration Server APIs
+     */
     private:
-        grpc::Status register_node_db(grpc::ServerContext* _context, const registration_apis::request* _request, registration_apis::response* _response) override
+        grpc::Status register_node_db(grpc::ServerContext* _context,
+                                        const registration_apis::request* _request,
+                                        registration_apis::response* _response) override
         {
             db_snapshot_t _db_snap{};
 #ifdef LOGS
@@ -129,62 +140,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
             server->Wait();
         }
     
-    private:
-        std::unique_ptr<registration_apis::add_meta> make_add_meta(uint32_t _id, uint32_t _size, std::string_view _file_name, void const* _data, uint32_t _db_ID)
-        {
-            std::unique_ptr<registration_apis::add_meta> ptr = std::make_unique<registration_apis::add_meta>();
-
-            ptr->set_id(_id);
-            ptr->set_data_size(_size);
-            ptr->set_file_name(_file_name);
-            ptr->set_data(_data, _size);
-            ptr->set_db_id(_db_ID);
-
-            return ptr;
-        }
-        
-        std::unique_ptr<registration_apis::lookup_meta> make_lookup_meta(std::string_view _file_name, uint32_t _id, uint32_t _db_ID)
-        {
-            std::unique_ptr<registration_apis::lookup_meta> ptr = std::make_unique<registration_apis::lookup_meta>();
-
-            ptr->set_file_name(_file_name);
-            ptr->set_seg_id(_id);
-            ptr->set_db_id(_db_ID);
-
-            return ptr;
-        }
-
-        registration_apis::db_update::Stub* get_stub(uint32_t ip_)
-        {
-            auto iter = m_stubs_map.find(ip_);
-            std::string channel_string_;
-            char string_ip[INET_ADDRSTRLEN];
-            if (iter == m_stubs_map.end()) {
-                /* FIXME: frame string better way */
-                inet_ntop(AF_INET, &ip_, string_ip, INET_ADDRSTRLEN);
-                std::string temp(string_ip);
-                channel_string_ = temp + ":" + std::to_string(PORT);
-#ifdef LOGS
-                std::cout << "Channel string: " << channel_string_ << "\n";
-#endif
-                auto channel = grpc::CreateChannel(channel_string_, grpc::InsecureChannelCredentials());
-                auto stub = registration_apis::db_update::NewStub(channel);
-
-                m_stubs_map[ip_] = std::move(stub);
-            }
-
-            return m_stubs_map[ip_].get();
-        }
     public:
-        gRPC()
-            :server_thread(&gRPC::start_server, this)
-        {
-            m_registration_cbs.reserve(5);
-        }
-        ~gRPC()
-        {
-            std::cout << "Grpc destroyed\n";
-        }
         bool _register_push_cbs(std::function<bool(db_snapshot_t&, action_t&)>&& _cb) override
         {
             m_registration_cbs.push_back(std::move(_cb));
@@ -195,8 +151,10 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
             server_thread.join();
         }
 
-        /* external APIs
-         * Should return immediately
+    /* GRPC client add/del/lookup APIs
+     */
+    public:
+        /* Sync APIs
          */
         bool _add(std::unique_ptr<segment<char>>& _segment, const db_snapshot_t& _db, add_cb&& cb_) override
         {
@@ -257,9 +215,9 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
             return segment<registration_apis::db_rsp>::create_segment(_rsp, _rsp->data().length(), _file_name);
         }
 
-        /* Client APIs */
+        /* Client Async APIs */
         using add_cb = typename RPC_helper::add_cb;
-        void _add_segment(std::unique_ptr<segment<char>>&& _segment, const db_snapshot_t& _db, add_cb&& cb_) override
+        bool _async_add(std::unique_ptr<segment<char>>&& _segment, const db_snapshot_t& _db, add_cb&& cb_) override
         {
             /* Maintain state throughout the lifetime of this request
              */
@@ -283,7 +241,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                         ctx_p = std::unique_ptr<grpc::ClientContext>(new grpc::ClientContext{});
                         m_stub->async()->add(ctx_p.get(), _add_meta.get(), &m_rsp,
                                 [this](grpc::Status status_) {
-                                        if (status_.ok()) {
+                                        if (status_.ok() && m_rsp.rsp()) {
                                             m_cb(status_, m_rsp);
                                         } else {
                                             if (retry_cnt < m_max_retry_cnt) {
@@ -312,10 +270,11 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
             };
 
             new Impl{*this, std::forward<std::unique_ptr<segment<char>>>(_segment), _db, std::forward<add_cb>(cb_)};
+            return true;
         }
 
         using async_lookup_cb = typename RPC_helper::async_lookup_cb;
-        bool _lookup_segment(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, async_lookup_cb&& cb_) override
+        bool _async_lookup(std::string_view _file_name, pType::segment_ID _segment_id, const db_snapshot_t& _db, async_lookup_cb&& cb_) override
         {
             class Impl {
                 public:
@@ -330,14 +289,14 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                     inline void send_lookup_request()
                     {
                         ctx_p = std::unique_ptr<grpc::ClientContext>(new grpc::ClientContext{});
-                        std::cout << "sent Lookup rsp\n";
                         m_stub->async()->lookup(ctx_p.get(), m_meta.get(), m_rsp, 
                                 [this](grpc::Status status) {
-                                    if (status.ok()) {
+                                    if (status.ok() && m_rsp->rsp()) {
+#ifdef LOGS
                                         std::cout << "got Lookup rsp\n";
+#endif
                                         m_cb(status, m_rsp);
                                     } else {
-                                        std::cout << "got failed Lookup rsp\n";
                                         if (retry_cnt < m_max_retry_cnt) {
                                             retry_cnt++;
                                             std::cout << "Lookup of segment " << m_meta->seg_id() << " failed. Retrying...\n";
@@ -383,7 +342,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                         ctx_p = std::unique_ptr<grpc::ClientContext>(new grpc::ClientContext{});
                         m_stub->async()->del(ctx_p.get(), m_meta.get(), &m_rsp, 
                                 [this](grpc::Status status) {
-                                if (status.ok()) {
+                                if (status.ok() && m_rsp.rsp()) {
                                     m_cb(status, m_rsp);
                                 } else {
                                     if (retry_cnt < m_max_retry_cnt) {
@@ -413,6 +372,54 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
             return true;
         }
     
+    private:
+        /* Helper functions
+         */
+        std::unique_ptr<registration_apis::add_meta> make_add_meta(uint32_t _id, uint32_t _size, std::string_view _file_name, void const* _data, uint32_t _db_ID)
+        {
+            std::unique_ptr<registration_apis::add_meta> ptr = std::make_unique<registration_apis::add_meta>();
+
+            ptr->set_id(_id);
+            ptr->set_data_size(_size);
+            ptr->set_file_name(_file_name);
+            ptr->set_data(_data, _size);
+            ptr->set_db_id(_db_ID);
+
+            return ptr;
+        }
+        
+        std::unique_ptr<registration_apis::lookup_meta> make_lookup_meta(std::string_view _file_name, uint32_t _id, uint32_t _db_ID)
+        {
+            std::unique_ptr<registration_apis::lookup_meta> ptr = std::make_unique<registration_apis::lookup_meta>();
+
+            ptr->set_file_name(_file_name);
+            ptr->set_seg_id(_id);
+            ptr->set_db_id(_db_ID);
+
+            return ptr;
+        }
+
+        registration_apis::db_update::Stub* get_stub(uint32_t ip_)
+        {
+            auto iter = m_stubs_map.find(ip_);
+            std::string channel_string_;
+            char string_ip[INET_ADDRSTRLEN];
+            if (iter == m_stubs_map.end()) {
+                /* FIXME: frame string better way */
+                inet_ntop(AF_INET, &ip_, string_ip, INET_ADDRSTRLEN);
+                std::string temp(string_ip);
+                channel_string_ = temp + ":" + std::to_string(PORT);
+#ifdef LOGS
+                std::cout << "Channel string: " << channel_string_ << "\n";
+#endif
+                auto channel = grpc::CreateChannel(channel_string_, grpc::InsecureChannelCredentials());
+                auto stub = registration_apis::db_update::NewStub(channel);
+
+                m_stubs_map[ip_] = std::move(stub);
+            }
+
+            return m_stubs_map[ip_].get();
+        }
     private:
         std::vector<std::function<bool(db_snapshot_t&, action_t&)>> m_registration_cbs;
         std::thread server_thread;

@@ -14,22 +14,22 @@ curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
    --dearmor
 
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-apt-get update
-apt-get install -y mongodb-org
-systemctl start mongod
+#apt-get update
+#apt-get install -y mongodb-org
+#systemctl start mongod
 
 
 
 
-curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.9.0/mongo-cxx-driver-r3.9.0.tar.gz
-tar -xzf mongo-cxx-driver-r3.9.0.tar.gz
-cd mongo-cxx-driver-r3.9.0/build
+#curl -OL https://github.com/mongodb/mongo-cxx-driver/releases/download/r3.9.0/mongo-cxx-driver-r3.9.0.tar.gz
+#tar -xzf mongo-cxx-driver-r3.9.0.tar.gz
+#cd mongo-cxx-driver-r3.9.0/build
 
-cmake ..                                \
-    -DCMAKE_BUILD_TYPE=Release          \
-    -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF
+#cmake ..                                \
+#    -DCMAKE_BUILD_TYPE=Release          \
+#    -DMONGOCXX_OVERRIDE_DEFAULT_INSTALL_PREFIX=OFF
 
-cmake --build .
-cmake --build . --target install
+#cmake --build .
+#cmake --build . --target install
 
 /bin/bash
