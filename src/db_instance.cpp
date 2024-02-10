@@ -5,6 +5,7 @@
 #include "db_instance.h"
 #include "bsoncxx/document/value.hpp"
 #include "bsoncxx/json.hpp"
+#include "mongocxx/database.hpp"
 #include "segment.h"
 
 bsoncxx::document::view global_view;
@@ -30,13 +31,15 @@ db_instance::get_id()
 }
 
 db_instance::db_instance(std::string&& _db_name, 
-                            mongocxx::client& _mongo_client)
+                            mongocxx::pool* _mongo_client)
     : m_name(_db_name), m_id(0), m_id_offset(offsetof(db_instance, m_id)),
-     m_database(_mongo_client[m_name]), m_collection(m_database["segments"])
+      m_client_pool(_mongo_client)
 {
+    auto client_ = m_client_helper(*m_client_pool, m_name);
     try {
+        auto database_ = client_.get_database();
         const auto ping_cmd = bsoncxx::builder::basic::make_document(bsoncxx::builder::basic::kvp("ping", 1));
-        m_database.run_command(ping_cmd.view());
+        database_.run_command(ping_cmd.view());
     } catch(const std::exception& e) {
         std::cout << "Cannot connect to database\n" << std::endl;
     }
@@ -45,7 +48,8 @@ db_instance::db_instance(std::string&& _db_name,
             kvp("m_file_name", 1),
             kvp("m_segment_id", 1)
             );
-    m_collection.create_index(std::move(__index_specification));
+    auto collection_ = client_.get_collection();
+    collection_.create_index(std::move(__index_specification));
     
 }
 
@@ -58,6 +62,8 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
      * If already present, ignore
      */
     mongocxx::options::update __opts;
+    auto client_ = m_client_helper(*m_client_pool, m_name);
+    auto collection_ = client_.get_collection();
     __opts.upsert(true);
 
     auto __segment_doc = make_document(
@@ -71,7 +77,7 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
             kvp("m_file_name", bsoncxx::types::b_string{_file_name})
             );
 
-    auto __insert_one_result = m_collection.update_one(
+    auto __insert_one_result = collection_.update_one(
             __lookup_segment_doc.view(),
             make_document(
                 kvp("$setOnInsert", __segment_doc)
@@ -79,7 +85,9 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
             __opts
             );
 
+#ifdef LOGS
     std::cout << "Inserted segment: " << _segment_id << " DBID: " << m_id << "\n";
+#endif
     assert(__insert_one_result);
     /*   
          auto doc_view = doc_value.view();
@@ -100,13 +108,16 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
 std::unique_ptr<db_instance::segment_t>
 db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
 {
-    auto __lookup_segment = m_collection.find_one(make_document(
+    auto client_ = m_client_helper(*m_client_pool, m_name);
+    auto collection_ = client_.get_collection();
+
+    auto __lookup_segment = collection_.find_one(make_document(
                 kvp("m_segment_id", bsoncxx::types::b_int64{_segment_id}),
                 kvp("m_file_name", bsoncxx::types::b_string{_file_name})
                 ));
 
     if (__lookup_segment) {
-        //std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
+        std::cout << bsoncxx::to_json(__lookup_segment->view()) << std::endl;
         auto segment_view = __lookup_segment->view(); 
         global_view = segment_view;
         auto __file_name = segment_view["m_file_name"];
@@ -132,13 +143,17 @@ db_instance::lookup_segment(const char* _file_name, uint32_t _segment_id)
 bool
 db_instance::remove_segment(const char* _file_name, uint32_t _segment_id)
 {
+    auto client_ = m_client_helper(*m_client_pool, m_name);
+    auto collection_ = client_.get_collection();
     auto __rem_doc = make_document(
             kvp("m_segment_id", bsoncxx::types::b_int64{_segment_id}),
             kvp("m_file_name", bsoncxx::types::b_string{_file_name})
             );
 
-    auto __del_one_res = m_collection.delete_one(__rem_doc.view());
+    auto __del_one_res = collection_.delete_one(__rem_doc.view());
+#ifdef LOGS
     std::cout << "del segment: " << _segment_id << "\n";
+#endif
     assert(__del_one_res->deleted_count() == 1);
 
     return true;
@@ -146,7 +161,9 @@ db_instance::remove_segment(const char* _file_name, uint32_t _segment_id)
 void
 db_instance::del_all()
 {
-    m_collection.delete_many({});
+    auto client_ = m_client_helper(*m_client_pool, m_name);
+    auto collection_ = client_.get_collection();
+    collection_.delete_many({});
 }
 db_instance::~db_instance()
 {

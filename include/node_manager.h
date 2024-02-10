@@ -1,10 +1,9 @@
 #pragma once
 
 #include "hash.h"
+#include "mongocxx/options/auto_encryption.hpp"
 #include "segment.h"
 #include "db_instance.h"
-#include "mongocxx/collection.hpp"
-#include "mongocxx/database.hpp"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -15,6 +14,7 @@
 #include <mongocxx/instance.hpp>
 #include <mongocxx/stdx.hpp>
 #include <mongocxx/uri.hpp>
+#include <mongocxx/pool.hpp>
 #include <sys/types.h>
 
 #define MONGO_DB "test200"
@@ -24,13 +24,6 @@
 
 class node_manager {
     using segment_t = segment<uint8_t*>;
-    private:
-        Hash<Hash_linear, db_instance, uint32_t> m_db_hash;
-        List m_db_list;
-        mongocxx::instance m_instance;
-        mongocxx::client m_mong_client;
-        static bool m_db_hash_lookup(void*, void*);
-
     public:
         node_manager();
         bool add_db(std::string& db_name);
@@ -41,4 +34,12 @@ class node_manager {
         std::string test();
         void del_all(uint32_t db_id);
         ~node_manager();
+    
+    private:
+        Hash<Hash_linear, db_instance, uint32_t> m_db_hash;
+        List m_db_list;
+        mongocxx::instance m_instance;
+        mongocxx::pool m_client_pool;
+        static bool m_db_hash_lookup(void*, void*);
+
 };

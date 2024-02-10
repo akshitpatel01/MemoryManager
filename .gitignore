@@ -12,3 +12,5 @@ gens/
 protos/
 CPack*
 http_archives/
+Makefile
+lib/

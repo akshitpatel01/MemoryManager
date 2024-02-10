@@ -1,6 +1,7 @@
 #include "node_manager.h"
 #include "db_instance.h"
 #include "list.h"
+#include "mongocxx/options/pool.hpp"
 #include <cstdint>
 #include <string>
 #include <sys/types.h>
@@ -28,7 +29,7 @@ node_manager::node_manager()
             uint32_t* __db2_key = static_cast<uint32_t*>(_b);
             
             return (*__db1_key == *__db2_key);
-            }), m_instance(), m_mong_client(mongocxx::uri{})
+            }), m_instance{}, m_client_pool{mongocxx::uri{"mongodb://localhost:27017/?minPoolSize=300&maxPoolSize=300"}}
 {
 }
 
@@ -37,7 +38,7 @@ node_manager::add_db(std::string& db_name)
 {
     /* TODO: check for duplicates*/
 
-    db_instance *__new_db = new db_instance(std::move(db_name), m_mong_client);
+    db_instance *__new_db = new db_instance(std::move(db_name), &m_client_pool);
     if (__new_db == nullptr) {
         return false;
     }
@@ -45,13 +46,17 @@ node_manager::add_db(std::string& db_name)
     /* TODO: Register with blob manager */
     __new_db->set_id(++id);
 
+#ifdef LOGS
     std::cout << __new_db->get_id() << "\n";
+#endif
     m_db_hash.insert((uint32_t*)(((char*)__new_db) + __new_db->get_id_offset()), __new_db);
     m_db_list.insert_tail(__new_db);
 
     uint key = __new_db->get_id();
     if (m_db_hash.lookup(&key)) {
+#ifdef LOGS
         std::cout << "Added successfully\n";
+#endif
     }
     return true;
 }
@@ -78,7 +83,6 @@ node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id
 {
     db_instance* __db = nullptr;
 
-    std::cout << "heheh\n";
     if ((__db = m_db_hash.lookup(&_db_id))) {
         return __db->insert_segment(_segment->get_file_name().data(), _segment->get_id(), _segment->get_data(),
                                     _segment->get_len());
