@@ -110,7 +110,7 @@ class Central_manager {
         }
         void periodic_meta_dump()
         {
-            t1 = std::thread(&Central_manager::dump_all_meta, this);
+            //t1 = std::thread(&Central_manager::dump_all_meta, this);
         }
 
     public:

@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <utility>
 #include <vector>
+#define LOGS
 namespace pType {
     using segment_ID = uint32_t;
     using node_ID = uint32_t;
@@ -29,7 +30,7 @@ struct db_meta_t {
 };
 
 #define DEFAULT_DBS_PER_NODE 10
-#define SEGMENT_SIZE 1000000
+#define SEGMENT_SIZE 100000
 #define REPLICATION_FACTOR 20
 struct node_db_map {
     node_meta_t m_node;

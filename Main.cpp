@@ -1,7 +1,5 @@
 #include "blob_manager.h"
 #include "central_manager.h"
-#include "grpcpp/create_channel.h"
-#include "grpcpp/security/credentials.h"
 #include "hash_helper.h"
 #include "rpc.h"
 #include <chrono>
@@ -10,10 +8,25 @@
 void test_add(Blob_manager* _obj)
 {
     std::this_thread::sleep_for(std::chrono::seconds(10));
+    File::iter ptr;
 
-    _obj->add("test.txt");
-    auto seg_vector = _obj->get("test.txt");
-    std::cout << seg_vector.size() << "Size\n";
+    {
+        std::string fname{"test.txt"};
+        auto file = _obj->async_add(fname);
+        file->wait();
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    {
+        std::string fname{"test.txt"};
+        auto file = _obj->async_get(fname);
+        while ((file->next(ptr))) {
+            char c[ptr.len+1];
+            memcpy(c, ptr.data, ptr.len);
+            c[ptr.len] = '\0';
+            std::cout << c << "\n";
+        }
+    }
+#if 0
     for (auto& seg: seg_vector) {
         std::cout << "Got something!!! " << seg->get_len() << "\n";
         char c[seg->get_len()+1];
@@ -21,15 +34,24 @@ void test_add(Blob_manager* _obj)
         c[seg->get_len()] = '\0';
         std::cout << c << "\n";
     }
+#endif
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    _obj->remove("test.txt");
-    seg_vector = _obj->get("test.txt");
-    std::cout << seg_vector.size() << "Size\n";
-    if (seg_vector.size() == 0) {
-        std::cout << "fine\n";
-    } else {
-        std::cout << "not fine\n";
+    {
+        std::string fname{"test.txt"};
+        auto file = _obj->async_remove(fname);
+        file->wait();
+    }
+    
+    {
+        std::string fname{"test.txt"};
+        auto file = _obj->async_get(fname);
+        while (file && (file->next(ptr))) {
+            char c[ptr.len+1];
+            memcpy(c, ptr.data, ptr.len);
+            c[ptr.len] = '\0';
+            std::cout << c << "\n";
+        }
     }
     std::cout << "Done\n";
 }

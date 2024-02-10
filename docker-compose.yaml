@@ -1,0 +1,15 @@
+services:
+  backend:
+    image: ubuntu
+    hostname: ubuntu
+    container_name: ubuntu
+    stdin_open: true
+    privileged: true
+    tty: true
+    command: sh blob/startup.sh
+    ports:
+      - 50051:50051
+      - 50052:50052
+    volumes:
+      - .:/blob
+      - /Users/akshitpatel/utils/MemoryManager:/node_manager

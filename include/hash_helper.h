@@ -45,6 +45,7 @@ class Hash_helper {
         int tdb;
         pType::db_ID get_db(size_t _hash)
         {
+            return 1;
             if (tdb == 1) {
                 tdb = 2;
                 return 1;
