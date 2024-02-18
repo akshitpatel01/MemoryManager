@@ -26,6 +26,7 @@ service Registeration {
 message db_rsp {
     bool rsp = 1;
     bytes data = 2;
+    uint32 id = 3;
 }
 message add_meta {
     uint32 id = 1;
@@ -40,7 +41,7 @@ message lookup_meta {
     string file_name = 3;
 }
 service db_update {
-    rpc add(add_meta) returns (db_rsp) {}
+    rpc add(stream add_meta) returns (stream db_rsp) {}
     rpc lookup(lookup_meta) returns (db_rsp) {}
     rpc del(lookup_meta) returns (db_rsp) {}
 }

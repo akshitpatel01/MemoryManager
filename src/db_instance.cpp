@@ -2,10 +2,16 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <stdexcept>
 #include "db_instance.h"
 #include "bsoncxx/document/value.hpp"
 #include "bsoncxx/json.hpp"
+#include "bsoncxx/stdx/optional.hpp"
 #include "mongocxx/database.hpp"
+#include <mongocxx/exception/error_code.hpp>
+#include <mongocxx/exception/logic_error.hpp>
+#include <mongocxx/exception/operation_exception.hpp>
+#include <mongocxx/exception/server_error_code.hpp>
 #include "segment.h"
 
 bsoncxx::document::view global_view;
@@ -32,7 +38,7 @@ db_instance::get_id()
 
 db_instance::db_instance(std::string&& _db_name, 
                             mongocxx::pool* _mongo_client)
-    : m_name(_db_name), m_id(0), m_id_offset(offsetof(db_instance, m_id)),
+    : m_name(std::move(_db_name)), m_id(0), m_id_offset(offsetof(db_instance, m_id)),
       m_client_pool(_mongo_client)
 {
     auto client_ = m_client_helper(*m_client_pool, m_name);
@@ -64,6 +70,7 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
     mongocxx::options::update __opts;
     auto client_ = m_client_helper(*m_client_pool, m_name);
     auto collection_ = client_.get_collection();
+#if 0
     __opts.upsert(true);
 
     auto __segment_doc = make_document(
@@ -81,14 +88,25 @@ db_instance::insert_segment(const char* _file_name, uint32_t _segment_id, const 
             __lookup_segment_doc.view(),
             make_document(
                 kvp("$setOnInsert", __segment_doc)
-            ).view(),
+                ).view(),
             __opts
             );
+#endif
+    auto __insert_one_result = collection_.insert_one(make_document(
+                kvp("m_file_name", bsoncxx::types::b_string{_file_name}),
+                kvp("m_segment_id", bsoncxx::types::b_int64{_segment_id}),
+                kvp("m_segment_len", bsoncxx::types::b_int64{static_cast<int64_t>(_segment_size)}),
+                kvp("m_segment_data", bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary, static_cast<uint32_t>(_segment_size), (uint8_t*)_segment_data})
+                ));
 
 #ifdef LOGS
     std::cout << "Inserted segment: " << _segment_id << " DBID: " << m_id << "\n";
 #endif
+    //if (_segment_id == 10485)
+    //if(__insert_one_result)
+    //std::cout << _segment_id << ": " << __insert_one_result->inserted_id().get_string().value << "\n";
     assert(__insert_one_result);
+    //return (__insert_one_result->inserted_id() == 1);
     /*   
          auto doc_view = doc_value.view();
          auto file_name = doc_view["m_file_name"];

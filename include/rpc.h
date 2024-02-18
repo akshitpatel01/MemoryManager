@@ -1,11 +1,14 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <future>
 #include <grpcpp/support/status.h>
 #include <ifaddrs.h>
 #include <memory>
+#include <mutex>
 #include <sys/types.h>
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
@@ -87,21 +90,93 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
                     :owner_(owner)
                 {}
 
+#if 0
                 grpc::ServerUnaryReactor* add(grpc::CallbackServerContext* ctx, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* rsp) override
                 {
-                    bool _ret;
-                    std::string s{_add_req->file_name()};
-                    const auto ptr = std::unique_ptr<segment<uint8_t*>>(new observer_segment<uint8_t>((uint8_t*)_add_req->data().data(),
-                                _add_req->data().length(),
-                                std::move(s)));
-                    _ret = owner_._notify_add_cbs(ptr, _add_req->db_id());
-                    rsp->set_rsp(_ret);
+                        auto* reactor = ctx->DefaultReactor();
+                        auto f = std::async(std::launch::async, [reactor, _add_req, rsp, this]()
+                                {
+                                    bool _ret = false;
+                                    std::string s{_add_req->file_name()};
+                                    const auto ptr = std::unique_ptr<segment<uint8_t*>>(new observer_segment<uint8_t>((uint8_t*)_add_req->data().data(),
+                                                _add_req->data().length(),
+                                                std::move(s)));
+                                    std::cout << "ID1: " << _add_req->id() << "\n";
+                                    _ret = owner_._notify_add_cbs(ptr, _add_req->db_id());
+                                    //std::cout << "Ret: " << _ret << "\n";
+                                    std::cout << "ID4: " << _add_req->id() << "\n";
+                                    rsp->set_rsp(_ret);
 
-                    auto* reactor = ctx->DefaultReactor();
-                    reactor->Finish(grpc::Status::OK);
+                                    reactor->Finish(grpc::Status::OK);
+                                });
+                        owner_.add_fut(std::move(f), _add_req->id());
                     return reactor;
                 }
+#endif
+                grpc::ServerBidiReactor<registration_apis::add_meta, registration_apis::db_rsp>* add(grpc::CallbackServerContext* ctx) override
+                {
+                    class Impl: public grpc::ServerBidiReactor<registration_apis::add_meta,
+                                                               registration_apis::db_rsp> {
+                        public:
+                            Impl(gRPC& owner)
+                                :m_owner(owner)
+                            {
+                                read_internal();
+                            }
+                            void OnDone() override
+                            {
+                                delete this;
+                            }
+                            
+                            void OnReadDone(bool ok) override
+                            {
+                                if (ok) {
+                                    std::string s{m_req.file_name()};
+                                    const auto ptr = std::unique_ptr<segment<uint8_t*>>(new observer_segment<uint8_t>((uint8_t*)m_req.data().data(),
+                                                m_req.data().length(),
+                                                std::move(s), m_req.id()));
+                                    //std::cout << "ID1: " << _add_req->id() << "\n";
+                                    m_owner._notify_add_cbs(ptr, m_req.db_id());
+                                    //std::cout << "Ret: " << _ret << "\n";
+                                    //std::cout << "ID4: " << _add_req->id() << "\n";
+                                    write_internal(true, m_req.id());
+                                    read_internal();
+                                    return;
+                                }
 
+                                m_rsp.set_rsp(true);
+                                std::cout << "Finish\n";
+                                Finish(grpc::Status::OK);
+                            }
+                            void OnWriteDone(bool ok) override
+                            {
+                                if (ok) {
+                                } else {
+                                    std::cout << "Failed\n";
+                                }
+                            }
+                        private:
+                            void write_internal(bool ok, uint32_t idx)
+                            {
+                                m_rsp.Clear();
+                                m_rsp.set_rsp(ok);
+                                m_rsp.set_id(idx);
+                                StartWrite(&m_rsp);
+                            }
+                            void read_internal()
+                            {
+                                m_req.Clear();
+                                StartRead(&m_req);
+                            }
+                        private:
+                            gRPC& m_owner;
+                            registration_apis::add_meta m_req;
+                            registration_apis::db_rsp m_rsp;
+                
+                    };
+                    return new Impl{owner_};
+
+                }
                 grpc::ServerUnaryReactor* lookup(grpc::CallbackServerContext* ctx, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_rsp* _rsp) override
                 {
                     bool _ret = false;
@@ -146,6 +221,14 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         std::thread server_thread;
         std::unique_ptr<CallbackServiceImpl> service_;
         std::vector<std::future<void>> m_fut;
+        std::mutex m_lock;
+
+    public:
+        void add_fut(std::future<void>&& fut, uint idx)
+        {
+            //std::scoped_lock<std::mutex> lock_(m_lock);
+            m_fut[idx] = (std::move(fut));
+        }
         
     public:
         gRPC(std::shared_ptr<grpc::ChannelInterface> channel, add_cb&& _add_cb, lookup_cb&& _lookup_cb, del_cb&& _del_cb)
@@ -153,8 +236,10 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
              m_add_cb(std::move(_add_cb)),
              m_lookup_cb(std::move(_lookup_cb)),
              m_del_cb(std::move(_del_cb)),
-             server_thread(&gRPC::start_server, this)
-        {}
+             server_thread(&gRPC::start_server, this),
+             m_fut{10487}
+        {
+        }
         ~gRPC()
         {
             server_thread.join();
@@ -208,7 +293,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
 
         void start_server()
         {
-            std::string server_address("192.168.1.200:50053");
+            std::string server_address("192.168.1.201:50053");
 
             grpc::ServerBuilder builder;
             builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -223,11 +308,6 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
     private:
         bool _notify_add_cbs(const std::unique_ptr<segment_t>& _segment, uint32_t _id)
         {
-#ifdef LOGS
-            std::cout << "triggered all db cbs\n";
-#endif
-            
-            //return true;
             return m_add_cb(_segment, _id);
         }
         std::unique_ptr<segment_t> notify_lookup_cbs(const char* _file_name, uint32_t _seg_id, uint32_t _db_id)
@@ -238,6 +318,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         {
             return m_del_cb(_file_name, _seg_id, _db_id);
         }
+#if 0
         grpc::Status add(grpc::ServerContext* _context, const registration_apis::add_meta* _add_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret;
@@ -249,6 +330,7 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
             _rsp->set_rsp(_ret);
             return grpc::Status::OK; 
         }
+#endif
         grpc::Status lookup(grpc::ServerContext* _context, const registration_apis::lookup_meta* _lookup_req, registration_apis::db_rsp* _rsp) override
         {
             bool _ret = false;

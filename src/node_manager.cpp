@@ -29,7 +29,7 @@ node_manager::node_manager()
             uint32_t* __db2_key = static_cast<uint32_t*>(_b);
             
             return (*__db1_key == *__db2_key);
-            }), m_instance{}, m_client_pool{mongocxx::uri{"mongodb://localhost:27017/?minPoolSize=300&maxPoolSize=300"}}
+            }), m_instance{}, m_client_pool{mongocxx::uri{"mongodb://localhost:27017/?minPoolSize=100&maxPoolSize=100"}}
 {
 }
 
@@ -83,6 +83,7 @@ node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id
 {
     db_instance* __db = nullptr;
 
+    std::cout << "ID2: " << _segment->get_id() << "\n";
     if ((__db = m_db_hash.lookup(&_db_id))) {
         return __db->insert_segment(_segment->get_file_name().data(), _segment->get_id(), _segment->get_data(),
                                     _segment->get_len());

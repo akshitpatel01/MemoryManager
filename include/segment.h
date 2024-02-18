@@ -202,7 +202,7 @@ class owning_segment<bsoncxx::document::value, ret_t>: public segment<ret_t> {
         
     public:
         explicit owning_segment(holder_t&& _data, uint32_t _data_len, std::string&& _file_path,
-                    uint32_t _segment_id = m_seg_id_helper.get_id()) noexcept
+                    uint32_t _segment_id = m_seg_id_helper.get_id())
             : segment<ret_t>{_data_len, std::move(_file_path), _segment_id}, m_data(std::move(_data)) 
         {
         }
@@ -224,7 +224,7 @@ class observer_segment: public segment<ret_t> {
 
     public:
         explicit observer_segment(pointer_t _data, uint32_t _data_len, std::string&& _file_path,
-                uint32_t _segment_id = m_seg_id_helper.get_id()) noexcept
+                uint32_t _segment_id = m_seg_id_helper.get_id())
             : segment<ret_t>(_data_len, std::move(_file_path), _segment_id), m_data(_data)
             {
             }
