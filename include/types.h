@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 #include <netinet/in.h>
 #include <random>
 #include <sys/types.h>
@@ -32,7 +33,7 @@ struct db_meta_t {
 };
 
 #define DEFAULT_DBS_PER_NODE 10
-#define SEGMENT_SIZE 100000
+#define SEGMENT_SIZE 1000000
 #define REPLICATION_FACTOR 20
 struct node_db_map {
     node_meta_t m_node;
@@ -75,6 +76,7 @@ struct node_db_map {
         }
         stream << "NodeId: " << _map.m_node.m_id << "\n";
         stream << "NodeIP: " << ip << "\n";
+        //stream << "NodeIP: " << _map.m_node.m_ip_addr << "\n";
         for (auto& it: _map.m_dbs) {
             stream << "DBID: " << it.m_id << "\n";
         }
@@ -108,14 +110,16 @@ class ID_helper {
         std::vector<T> m_free_list;
         T m_max_id;
         T m_cur_id;
+        std::mutex m_lock;
     public:
-        ID_helper(T _max_id)
-            :m_max_id(_max_id), m_cur_id{1}
+        ID_helper(T _max_id, T start = 1)
+            :m_max_id(_max_id), m_cur_id{start}
         {
         }
 
         T get_id()
         {
+            std::scoped_lock<std::mutex> lock_(m_lock);
             T __ret = m_max_id;
 
             if (m_free_list.size() > 0) {

@@ -10,7 +10,7 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS")
 #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS")
-set (CMAKE_BUILD_TYPE Release)
+set (CMAKE_BUILD_TYPE Debug)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
@@ -180,7 +180,8 @@ file(GLOB PROTO_SRC ${PROTO_DIR}/**)
 
 set(exec blob_manager)
 add_executable(${exec}
-                Main.cpp)
+                Main.cpp
+                ${SRC})
 
 target_compile_options(${exec} PRIVATE -Wall -Werror -DCMAKE_EXPORT_COMPILE_COMMANDS)
 target_add_protobuf(${exec} ${PROTO_SRC})

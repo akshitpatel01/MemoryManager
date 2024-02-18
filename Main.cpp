@@ -8,13 +8,17 @@
 void test(Blob_manager* _obj)
 {
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    File::iter ptr;
+    //Blob_manager::File::iter ptr;
+    Blob_manager::File<registration_apis::db_rsp>::iter ptr;
 
     {
         PROFILE_SCOPE_FUNC("Add");
         std::string fname{"test.txt"};
-        auto file = _obj->async_add(fname);
-        file->wait();
+        //auto file = _obj->async_add(fname);
+        //file->wait();
+        std::cout << "Add start\n";
+        auto file_p = _obj->async_stream_add(fname);
+        file_p->wait();
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -22,9 +26,9 @@ void test(Blob_manager* _obj)
     {
         PROFILE_SCOPE_FUNC("Lookup");
         std::string fname{"test.txt"};
-        auto file = _obj->async_get(fname);
+        auto file_p = _obj->async_get(fname);
         auto cnt = 0;
-        while ((file->next(ptr))) {
+        while ((file_p->next(ptr))) {
 #ifdef LOGS
             char c[ptr.len+1];
             memcpy(c, ptr.data, ptr.len);
@@ -33,6 +37,7 @@ void test(Blob_manager* _obj)
 #endif
             cnt++;
         }
+        //std::this_thread::sleep_for(std::chrono::seconds(5));
         std::cout << "Successfull segment lookup: " << cnt << "\n";
     }
 
