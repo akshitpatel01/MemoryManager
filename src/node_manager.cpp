@@ -83,7 +83,7 @@ node_manager::insert(const std::unique_ptr<segment_t>& _segment, uint32_t _db_id
 {
     db_instance* __db = nullptr;
 
-    std::cout << "ID2: " << _segment->get_id() << "\n";
+    //std::cout << "ID2: " << _segment->get_id() << "\n";
     if ((__db = m_db_hash.lookup(&_db_id))) {
         return __db->insert_segment(_segment->get_file_name().data(), _segment->get_id(), _segment->get_data(),
                                     _segment->get_len());

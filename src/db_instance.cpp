@@ -2,11 +2,8 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
-#include <stdexcept>
 #include "db_instance.h"
 #include "bsoncxx/document/value.hpp"
-#include "bsoncxx/json.hpp"
-#include "bsoncxx/stdx/optional.hpp"
 #include "mongocxx/database.hpp"
 #include <mongocxx/exception/error_code.hpp>
 #include <mongocxx/exception/logic_error.hpp>

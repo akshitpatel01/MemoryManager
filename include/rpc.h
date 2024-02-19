@@ -1,8 +1,6 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
-#include <exception>
 #include <functional>
 #include <future>
 #include <grpcpp/support/status.h>
@@ -21,7 +19,7 @@
 #include <netinet/in.h>
 #include <vector>
 
-        static std::atomic<uint> cnt = 0;
+static std::atomic<uint> cnt = 0;
 typedef enum ip_type_t_ {
     IPV4 = AF_INET,
     IPV6 = AF_INET6,
@@ -135,11 +133,8 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
                                     const auto ptr = std::unique_ptr<segment<uint8_t*>>(new observer_segment<uint8_t>((uint8_t*)m_req.data().data(),
                                                 m_req.data().length(),
                                                 std::move(s), m_req.id()));
-                                    //std::cout << "ID1: " << _add_req->id() << "\n";
-                                    m_owner._notify_add_cbs(ptr, m_req.db_id());
-                                    //std::cout << "Ret: " << _ret << "\n";
-                                    //std::cout << "ID4: " << _add_req->id() << "\n";
-                                    write_internal(true, m_req.id());
+                                    bool ret_ = m_owner._notify_add_cbs(ptr, m_req.db_id());
+                                    write_internal(ret_, m_req.id());
                                     read_internal();
                                     return;
                                 }
@@ -153,6 +148,8 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
                                 if (ok) {
                                 } else {
                                     std::cout << "Failed\n";
+                                    grpc::Status status_ = {grpc::StatusCode::INTERNAL, "Server Write error"};
+                                    Finish(status_);
                                 }
                             }
                         private:
@@ -220,24 +217,15 @@ class gRPC: public RPC_helper, registration_apis::db_update::Service {
         del_cb m_del_cb;
         std::thread server_thread;
         std::unique_ptr<CallbackServiceImpl> service_;
-        std::vector<std::future<void>> m_fut;
         std::mutex m_lock;
 
-    public:
-        void add_fut(std::future<void>&& fut, uint idx)
-        {
-            //std::scoped_lock<std::mutex> lock_(m_lock);
-            m_fut[idx] = (std::move(fut));
-        }
-        
     public:
         gRPC(std::shared_ptr<grpc::ChannelInterface> channel, add_cb&& _add_cb, lookup_cb&& _lookup_cb, del_cb&& _del_cb)
             :stub_(registration_apis::Registeration::NewStub(channel)),
              m_add_cb(std::move(_add_cb)),
              m_lookup_cb(std::move(_lookup_cb)),
              m_del_cb(std::move(_del_cb)),
-             server_thread(&gRPC::start_server, this),
-             m_fut{10487}
+             server_thread(&gRPC::start_server, this)
         {
         }
         ~gRPC()
