@@ -134,6 +134,7 @@ class ID_helper {
 
         void free_id(T& _id)
         {
+            std::scoped_lock<std::mutex> lock_(m_lock);
             m_free_list.push_back(_id);
         }
 };

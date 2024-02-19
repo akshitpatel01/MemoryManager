@@ -37,31 +37,33 @@ class RPC_helper {
         using async_lookup_cb = std::function<void(grpc::Status, registration_apis::db_rsp*)>;
         using del_cb = std::function<void(grpc::Status, registration_apis::db_rsp&)>;
         using on_write_done_cb_t = std::function<void(bool)>;
-        using on_read_done_cb_t = std::function<void(bool, uint32_t)>;
+        using on_read_done_cb_t = std::function<void(bool, bool, uint32_t)>;
     
     public:
         class RPC_async_handler {
             public:
                 bool write();
+                virtual ~RPC_async_handler() {}
             private:
                 virtual bool _write() = 0;
         };
         template<typename T>
         class RPC_async_stream_handler {
             public:
+                virtual ~RPC_async_stream_handler() {}
                 bool write(const segment<T>* seg,
                            uint32_t db_id, uint32_t idx)
                 {
                     return _write(seg, db_id, idx);
                 }
-                bool done()
+                bool done(bool status)
                 {
-                    return _done();
+                    return _done(status);
                 }
             private:
                 virtual bool _write(const segment<T>* seg,
                                     uint32_t db_id, uint32_t idx) = 0;
-                virtual bool _done() = 0;
+                virtual bool _done(bool) = 0;
         };
 
     public:
@@ -335,6 +337,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                     read_internal();
                     StartCall();
                 }
+                ~Impl() = default;
 
                 public:
                 bool _write(const segment<char>* seg,
@@ -344,11 +347,12 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                     return true;
                 }
 
-                bool _done() override
+                bool _done(bool status) override
                 {
-                    std::cout << __FUNCTION__ << "\n";
+                    std::cout << __FUNCTION__ << ": " << std::this_thread::get_id() << "\n";
                     RemoveHold();
-                    StartWritesDone();
+                    if (status)
+                        StartWritesDone();
                     return true;
                 }
 
@@ -358,17 +362,11 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                     void OnWriteDone(bool ok) override
                     {
                         m_write_cb(ok);
-
-                        /* FIXME: Let caller handle cleanup
-                         */
-                        if (!ok) [[unlikely]] {
-                            _done();
-                        }
                     }
                     void OnReadDone(bool ok) override
                     {
                         if (ok) {
-                            m_read_cb(m_rsp.rsp(), m_rsp.id());
+                            m_read_cb(ok, m_rsp.rsp(), m_rsp.id());
                             read_internal();
                         } else {
                             std::cout << "NoT OK\n";
@@ -377,6 +375,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
 
                     void OnDone(const grpc::Status& s) override
                     {
+                        std::cout << "Called del: " << "\n";
                         delete this;
                     }
                     void write_internal(const segment<char>* seg, uint32_t idx,
@@ -437,6 +436,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                                         std::cout << "got Lookup rsp\n";
 #endif
                                         m_cb(status, m_rsp);
+                                        delete this;
                                     } else {
                                         if (!status.ok()) {
                                             std::cout << status.error_message() << "\n";
@@ -449,6 +449,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                                         } else {
                                             std::cout << "Lookup of segment " << m_meta->seg_id() << " failed.\n";
                                             m_cb(status, m_rsp);
+                                            delete this;
                                         }
                                     }
                                 });
@@ -488,6 +489,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                                 [this](grpc::Status status) {
                                 if (status.ok() && m_rsp.rsp()) {
                                     m_cb(status, m_rsp);
+                                    delete this;
                                 } else {
                                     if (retry_cnt < m_max_retry_cnt) {
                                         retry_cnt++;
@@ -497,6 +499,7 @@ class gRPC: public RPC_helper, registration_apis::Registeration::Service {
                                     } else {
                                         std::cout << "Delete of segment " << m_meta->seg_id() << " failed.\n";
                                         m_cb(status, m_rsp);
+                                        delete this;
                                     }
                                 }
                                 });

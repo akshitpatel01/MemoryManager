@@ -1,6 +1,7 @@
 #include "blob_manager.h"
 #include "central_manager.h"
 #include "hash_helper.h"
+#include "include/blob_manager.h"
 #include "rpc.h"
 #include "scope_profiler.h"
 #include <chrono>
@@ -8,14 +9,11 @@
 void test(Blob_manager* _obj)
 {
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    //Blob_manager::File::iter ptr;
     Blob_manager::File<registration_apis::db_rsp>::iter ptr;
 
     {
         PROFILE_SCOPE_FUNC("Add");
         std::string fname{"test.txt"};
-        //auto file = _obj->async_add(fname);
-        //file->wait();
         std::cout << "Add start\n";
         auto file_p = _obj->async_stream_add(fname);
         file_p->wait();
@@ -28,7 +26,7 @@ void test(Blob_manager* _obj)
         std::string fname{"test.txt"};
         auto file_p = _obj->async_get(fname);
         auto cnt = 0;
-        while ((file_p->next(ptr))) {
+        while ((file_p->next_segment(ptr) == Blob_manager::in_progress)) {
 #ifdef LOGS
             char c[ptr.len+1];
             memcpy(c, ptr.data, ptr.len);
@@ -54,7 +52,7 @@ void test(Blob_manager* _obj)
         std::string fname{"test.txt"};
         auto file = _obj->async_get(fname);
         uint cnt = 0;
-        while (file && (file->next(ptr))) {
+        while (file && (file->next_segment(ptr) == Blob_manager::in_progress)) {
 #ifdef LOGS
             char c[ptr.len+1];
             memcpy(c, ptr.data, ptr.len);

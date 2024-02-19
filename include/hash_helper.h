@@ -10,7 +10,6 @@
 #include <mutex>
 #include <set>
 
-
 class Hash_helper {
     public:
         Hash_helper(Central_manager& m_manager)
@@ -42,7 +41,6 @@ class Hash_helper {
 
         pType::db_ID get_db(size_t _hash)
         {
-            return 1;
            if (m_consistent_hash.size() == 0) {
                return INVALID_ID;
            }

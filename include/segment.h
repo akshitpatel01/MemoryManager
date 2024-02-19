@@ -9,14 +9,30 @@
 #include "registration_apis.pb.h"
 
 static ID_helper<uint32_t> m_seg_id_helper{5000000};
+template <typename T>
+struct default_delete
+{
+    void operator() (T* val)
+    {
+        delete val;
+    }
+};
+
+template <>
+struct default_delete<char> {
+    void operator() (char* val) {
+        delete[] val;
+    }
+};
+
 /* Template to pass around any kind of data.
  * Takes ownership and manages a pointer
  */
-template <typename data_t>
+template <typename data_t, class deleter>
 class segment_base {
     protected:
         using pointer_t = data_t*;
-        using unique_pointer_t = std::unique_ptr<data_t>;
+        using unique_pointer_t = std::unique_ptr<data_t, deleter>;
 
     protected:
         explicit segment_base(unique_pointer_t&& _data_p, uint32_t _data_len, std::string_view _file_path,
@@ -29,7 +45,10 @@ class segment_base {
         segment_base& operator=(const segment_base&) = delete;
         segment_base(segment_base&& seg) = default;
         segment_base& operator=(segment_base&& seg) = default;
-        ~segment_base() = default;
+        ~segment_base()
+        {
+            m_seg_id_helper.free_id(m_segment_id);
+        }
 
     protected:
         const pointer_t get_data_pointer() const
@@ -64,14 +83,14 @@ class segment_base {
 
 };
 
-template <typename data_t>
-class segment: public segment_base<data_t> {
-    using _base = segment_base<data_t>;
+template <typename data_t, class deleter = default_delete<data_t>>
+class segment: public segment_base<data_t, deleter> {
+    using _base = segment_base<data_t, deleter>;
     using pointer_t = typename _base::pointer_t;
     private:
         explicit segment(pointer_t _data, uint32_t _data_len, std::string_view _file_path,
                             uint32_t _segment_id = m_seg_id_helper.get_id())
-            : _base(std::unique_ptr<data_t>(_data), _data_len, _file_path, _segment_id)
+            : _base(std::unique_ptr<data_t, deleter>(_data), _data_len, _file_path, _segment_id)
         {}
 
     public:
@@ -95,14 +114,16 @@ class segment: public segment_base<data_t> {
 };
 
 template<>
-class segment<registration_apis::db_rsp>: public segment_base<registration_apis::db_rsp> {
+class segment<registration_apis::db_rsp, default_delete<registration_apis::db_rsp>>:
+    public segment_base<registration_apis::db_rsp, default_delete<registration_apis::db_rsp>> {
+    using deleter = default_delete<registration_apis::db_rsp>;
     using data_t = registration_apis::db_rsp;
-    using _base = segment_base<data_t>;
+    using _base = segment_base<data_t, default_delete<registration_apis::db_rsp>>;
     using pointer_t = typename _base::pointer_t;
     private:
         explicit segment(pointer_t _data, uint32_t _data_len, std::string_view _file_path,
                             uint32_t _segment_id = m_seg_id_helper.get_id())
-            : _base(std::unique_ptr<data_t>(_data), _data_len, _file_path, _segment_id)
+            : _base(std::unique_ptr<data_t, deleter>(_data), _data_len, _file_path, _segment_id)
         {}
     
     public:

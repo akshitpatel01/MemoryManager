@@ -45,24 +45,32 @@ class Blob_manager {
             DEL
         };
 
+        enum status_t {
+            in_progress = 1,
+            success,
+            failure,
+            rpc_failure
+        };
+
     
     public:
         Blob_manager(Hash_helper& _hash_helper, RPC_helper& _rpc, Central_manager& _manager);
     public:
+        /* File is essentially a handle returned by blob manager for any requested
+         * operation (add/lookup/del). It is in principal similar to future but
+         * with some callable public APIs based on the operation requested.
+         * ONE File represents ONE operation.
+         */
         template<typename T>
         class File {
+            protected:
+            using status_t = typename Blob_manager::status_t;
             public:
             struct iter {
                 const void* data;
                 uint32_t len;
             };
 
-            enum status_t {
-                in_progress = 1,
-                success,
-                failure
-            };
-            
             explicit File(Blob_manager& owner, std::string_view name, operation_t operation);
             explicit File(Blob_manager& owner, std::string_view name, uint32_t total_segments, operation_t operation);
             virtual ~File();
@@ -71,13 +79,13 @@ class Blob_manager {
                 bool init (uint32_t total_segments);
                 bool set_segment_without_fill(std::unique_ptr<segment<T>>&& segment, uint32_t idx);
                 const segment<T>* get_segment(uint32_t idx);
-                bool handle_failure();
+                bool handle_failure(status_t);
             public:
             /* block till the entire operation is completed
              */
             bool wait();
             std::string_view name();
-            bool next(iter& ptr);
+            status_t next_segment(iter& ptr);
             virtual bool handle(std::unique_ptr<segment<T>>&& segment, status_t status, uint32_t idx) = 0;
             virtual void done(void* mssg) = 0;
 
@@ -167,6 +175,7 @@ class Blob_manager {
                 operation_t m_operation;
                 uint32_t m_iter;
                 uint32_t m_filled_segments{};
+                uint32_t m_sent_segments{};
         };
 
         class File_add: public File<char> {
